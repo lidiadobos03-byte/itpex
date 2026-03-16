@@ -354,14 +354,56 @@
   }
   .btn-book:hover { background: var(--green-dark); transform: translateY(-2px); box-shadow: 0 10px 28px rgba(26,77,46,0.35); }
 
-  .booking-success { text-align: center; padding: 40px 20px; display: none; }
-  .booking-success .success-icon { font-size: 64px; margin-bottom: 16px; }
-  .booking-success h3 {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 28px; font-weight: 900; text-transform: uppercase;
-    margin-bottom: 10px; color: var(--green-brand);
+  .booking-success {
+    display: none;
+    padding: 12px;
   }
-  .booking-success p { font-size: 14px; color: var(--gray-500); line-height: 1.8; }
+  .success-card {
+    background: linear-gradient(180deg, #f7fbf9 0%, #ffffff 100%);
+    border: 1.5px solid rgba(45,122,71,0.18);
+    border-radius: 18px;
+    box-shadow: var(--shadow-lg);
+    padding: 28px 22px 26px;
+    text-align: center;
+  }
+  .success-icon {
+    font-size: 66px;
+    margin-bottom: 10px;
+    display: inline-block;
+    filter: drop-shadow(0 6px 16px rgba(26,77,46,0.28));
+  }
+  .success-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 32px;
+    letter-spacing: 0.5px;
+    color: var(--green-brand);
+    margin-bottom: 6px;
+  }
+  .success-lead {
+    font-size: 15px;
+    color: var(--gray-700);
+    margin-bottom: 16px;
+    line-height: 1.6;
+  }
+  .success-details {
+    background: #f0f7f3;
+    border: 1px solid rgba(45,122,71,0.16);
+    border-radius: 14px;
+    padding: 14px 16px;
+    text-align: left;
+    display: grid;
+    gap: 10px;
+    font-size: 14px;
+    color: var(--gray-700);
+    margin-bottom: 16px;
+  }
+  .success-details strong { color: var(--black); }
+  .success-foot {
+    font-size: 13px;
+    color: var(--gray-500);
+    margin-bottom: 16px;
+    line-height: 1.55;
+  }
 
   /* ── DE CE NOI ── */
   #despre { background: var(--green-ultra); }
@@ -489,7 +531,7 @@
       <p class="service-desc">ITP complet pentru autoturisme, rapid și corect.</p>
       <div class="service-price">150 lei <span>/ inspecție</span></div>
       <div class="docs-card">
-        <div class="docs-title">Acte necesare pentru efectuarea ITP</div>
+        <div class="docs-title">Acte necesare pentru ITP</div>
         <ul class="docs-list">
           <li><span class="docs-bullet"></span>Certificatul de înmatriculare (talon) — original sau dovada înlocuitoare</li>
           <li><span class="docs-bullet"></span>Cartea de identitate a conducătorului auto — original</li>
@@ -642,10 +684,14 @@
       </div>
 
       <div class="booking-success" id="bookingSuccess">
-        <div class="success-icon">✅</div>
-        <h3>Programare confirmată</h3>
-        <p id="successDetails"></p>
-        <button class="btn-secondary" onclick="resetBooking()">Programează altă oră</button>
+        <div class="success-card">
+          <div class="success-icon">✅</div>
+          <div class="success-title">Programare confirmată</div>
+          <div class="success-lead" id="successLead"></div>
+          <div class="success-details" id="successDetails"></div>
+          <div class="success-foot">Am înregistrat solicitarea. Te contactăm pentru confirmare. Te așteptăm la <strong>ITPEX</strong>, Str. Daciei nr. 30.</div>
+          <button class="btn-secondary" onclick="resetBooking()">Programează altă oră</button>
+        </div>
       </div>
     </div>
   </div>
@@ -938,22 +984,24 @@ document.getElementById("btnBook").addEventListener("click",async ()=>{
   if(marcaModel) carParts.push(marcaModel);
   if(combustibil) carParts.push(combustibil);
   if(an) carParts.push(an);
-  let reminderLine = "";
-  if(reminderConsent){
-    const map={email:"Email",sms:"SMS",whatsapp:"WhatsApp"};
-    reminderLine = '🔔 Reminder expirare: <strong>Cu 7 zile înainte</strong> pe <strong>'+(map[reminderChannel]||"canalul ales")+'</strong><br>';
-  }
-  const confirmLine = 'Am înregistrat solicitarea. Te contactăm pentru confirmare.';
+  const map={email:"Email",sms:"SMS",whatsapp:"WhatsApp"};
+  const reminderLine = reminderConsent
+    ? '🔔 Reminder expirare: <strong>Cu 7 zile înainte</strong> pe <strong>'+(map[reminderChannel]||"canalul ales")+'</strong>'
+    : "";
 
-  document.getElementById("successDetails").innerHTML=
-    '<strong>'+nume+'</strong>, programarea ta a fost înregistrată!<br><br>'+
-    '📅 <strong>'+dateLabel+'</strong> la <strong>'+oraVal+'</strong><br>'+
-    '🚗 Autovehicul: <strong>'+carParts.join(" • ")+'</strong><br>'+
-    reminderLine+
-    (obs ? '📝 Observații: <strong>'+obs+'</strong><br><br>' : '<br>')+
-    confirmLine+'<br>Te așteptăm la <strong>ITPEX</strong>!';
+  document.getElementById("successLead").textContent = `${nume}, programarea ta a fost înregistrată!`;
+  const detailLines = [
+    '📅 <strong>'+dateLabel+'</strong> la <strong>'+oraVal+'</strong>',
+    '🚗 Autovehicul: <strong>'+carParts.join(" • ")+'</strong>',
+    reminderLine,
+    obs ? '📝 Observații: <strong>'+obs+'</strong>' : '',
+    '📍 Stație: <strong>ITPEX — Str. Daciei nr. 30</strong>'
+  ].filter(Boolean);
+  document.getElementById("successDetails").innerHTML = detailLines.map(l=>`<div>${l}</div>`).join("");
+
   document.getElementById("bookingContent").style.display="none";
   document.getElementById("bookingSuccess").style.display="block";
+  document.getElementById("bookingSuccess").scrollIntoView({behavior:"smooth", block:"start"});
   const toast=document.getElementById("toast"); toast.classList.add("show"); setTimeout(()=>toast.classList.remove("show"),4000);
   // Reîmprospătăm calendarul ca ora aleasă să devină ocupată
   await loadAvailability();

@@ -44,35 +44,53 @@ function getMailer() {
   return mailer;
 }
 
-async function buildBookingExcel(booking) {
+async function buildBookingsExcel(bookings = []) {
   const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet("Programare");
+  const ws = wb.addWorksheet("Programări");
   ws.columns = [
-    { header: "Nume", key: "name", width: 24 },
-    { header: "Telefon", key: "phone", width: 16 },
+    { header: "Nume", key: "name", width: 22 },
+    { header: "Telefon", key: "phone", width: 14 },
     { header: "Email", key: "email", width: 24 },
-    { header: "Nr. Auto", key: "plate", width: 14 },
+    { header: "Nr. Auto", key: "plate", width: 12 },
     { header: "Marca / Model", key: "marcaModel", width: 18 },
-    { header: "Combustibil", key: "combustibil", width: 14 },
+    { header: "Combustibil", key: "combustibil", width: 12 },
     { header: "An", key: "an", width: 8 },
-    { header: "Data", key: "date", width: 12 },
+    { header: "Data", key: "date", width: 14 },
     { header: "Ora", key: "time", width: 10 },
-    { header: "Serviciu", key: "service", width: 18 },
-    { header: "Observații", key: "notes", width: 32 },
+    { header: "Serviciu", key: "service", width: 16 },
+    { header: "Observații", key: "notes", width: 28 },
+    { header: "Reminder", key: "reminderChannel", width: 12 },
+    { header: "Status", key: "status", width: 10 },
+    { header: "Creat la", key: "createdAt", width: 20 },
   ];
 
-  ws.addRow({
-    name: booking.name,
-    phone: booking.phone,
-    email: booking.email || "-",
-    plate: booking.plate,
-    marcaModel: booking.marcaModel || booking.model || "-",
-    combustibil: booking.combustibil || booking.fuel || "-",
-    an: booking.an || booking.year || "-",
-    date: booking.dateText || booking.date,
-    time: booking.time,
-    service: booking.service || "ITP",
-    notes: booking.notes || "-",
+  const ordered = [...bookings].sort((a, b) => {
+    const toTs = (item) => {
+      const base = item.date || item.dateText || "1970-01-01";
+      const t = item.time || "00:00";
+      const d = new Date(`${base}T${t}`);
+      return Number.isNaN(d.getTime()) ? 0 : d.getTime();
+    };
+    return toTs(a) - toTs(b);
+  });
+
+  ordered.forEach((booking) => {
+    ws.addRow({
+      name: booking.name,
+      phone: booking.phone,
+      email: booking.email || "-",
+      plate: booking.plate,
+      marcaModel: booking.marcaModel || booking.model || "-",
+      combustibil: booking.combustibil || booking.fuel || "-",
+      an: booking.an || booking.year || "-",
+      date: booking.dateText || booking.date,
+      time: booking.time,
+      service: booking.service || "ITP",
+      notes: booking.notes || "-",
+      reminderChannel: booking.reminderChannel || "-",
+      status: booking.status || "-",
+      createdAt: booking.createdAt || "-",
+    });
   });
 
   ws.getRow(1).font = { bold: true };
@@ -90,7 +108,8 @@ async function sendBookingEmail(booking) {
   }
 
   try {
-    const excelBuffer = await buildBookingExcel(booking);
+    const store = await readStore();
+    const excelBuffer = await buildBookingsExcel(store.bookings || []);
     const subject = `Programare ITP ${booking.date} ${booking.time} — ${booking.name}`;
     const text = [
       `Nume: ${booking.name}`,
@@ -110,7 +129,7 @@ async function sendBookingEmail(booking) {
       text,
       attachments: [
         {
-          filename: `programare-${booking.date}-${booking.time}.xlsx`,
+          filename: `programari-itp.xlsx`,
           content: excelBuffer.toString("base64"),
         },
       ],
