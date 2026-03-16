@@ -113,6 +113,35 @@ async function sendBookingEmail(booking) {
   }
 }
 
+async function sendClientEmail(booking) {
+  if (!booking.email) return;
+  const transport = getMailer();
+  if (!transport) return;
+  try {
+    const subject = `Confirmare programare ITP ${booking.date} ${booking.time}`;
+    const text = [
+      `Bună, ${booking.name}!`,
+      `Programarea ta ITP a fost înregistrată.`,
+      `Data: ${booking.dateText || booking.date}`,
+      `Ora: ${booking.time}`,
+      `Nr auto: ${booking.plate}`,
+      `Serviciu: ${booking.service || "ITP"}`,
+      `Observații: ${booking.notes || "-"}`,
+      ``,
+      `Ne vedem la ITPEX, Str. Daciei nr. 30.`,
+      `Dacă ai întrebări, sună-ne la ${MAIL_TO || "0741 406 263"}.`,
+    ].join("\n");
+    await transport.sendMail({
+      from: MAIL_FROM || SMTP_USER,
+      to: booking.email,
+      subject,
+      text,
+    });
+  } catch (err) {
+    console.warn("⚠️  Nu am putut trimite emailul de confirmare către client:", err.message);
+  }
+}
+
 if (!ADMIN_PASS) {
   console.warn("⚠️  Set ADMIN_PASS env var for production. Using fallback 'admin' for now.");
 }
@@ -224,6 +253,7 @@ app.post("/api/bookings", async (req, res) => {
   store.bookings.push(newBooking);
   await writeStore(store);
   sendBookingEmail(newBooking).catch(() => {});
+  sendClientEmail(newBooking).catch(() => {});
   res.json({ ok: true, booking: newBooking });
 });
 

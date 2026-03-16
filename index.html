@@ -284,6 +284,11 @@
     content: ''; position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%);
     width: 4px; height: 4px; border-radius: 50%; background: var(--green-brand);
   }
+  .cal-day.partial::after {
+    content: ''; position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%);
+    width: 6px; height: 6px; border-radius: 50%; background: #ef4444;
+    box-shadow: 0 0 0 4px rgba(239,68,68,0.15);
+  }
   .cal-day.selected::after { background: var(--white); }
   .cal-day.full { color: var(--gray-300); cursor: not-allowed; }
   .cal-day.full::after { background: #ef4444; opacity: 0.6; }
@@ -302,7 +307,13 @@
   }
   .slot-btn:hover:not(.slot-full) { background: var(--green-pale); border-color: var(--green-brand); color: var(--green-dark); }
   .slot-btn.slot-selected { background: var(--green-brand); border-color: var(--green-brand); color: var(--white); font-weight: 700; box-shadow: 0 4px 14px rgba(45,122,71,0.3); }
-  .slot-btn.slot-full { background: #fef2f2; border-color: #fecaca; color: #d1d5db; cursor: not-allowed; }
+  .slot-btn.slot-full {
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: #ef4444;
+    cursor: not-allowed;
+    position: relative;
+  }
   .slot-full-label { font-size: 10px; color: #ef4444; display: block; font-weight: 700; }
 
   .form-group { margin-bottom: 12px; }
@@ -394,6 +405,11 @@
     text-decoration: none; margin-bottom: 9px; transition: color 0.2s; line-height: 1.5;
   }
   .footer-col a:hover { color: var(--white); }
+  .contact-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
   .footer-bottom {
     max-width: 1100px; margin: 24px auto 0;
     display: flex; justify-content: space-between; align-items: center;
@@ -526,8 +542,8 @@
             <input class="form-input" id="fTel" placeholder="07xx xxx xxx">
           </div>
           <div class="form-group">
-            <label>Email</label>
-            <input class="form-input" id="fEmail" placeholder="email@exemplu.ro">
+            <label>Email (opțional)</label>
+            <input class="form-input" id="fEmail" placeholder="email@exemplu.ro (dacă vrei confirmare pe email)">
           </div>
         </div>
 
@@ -681,7 +697,7 @@
     <div class="footer-col">
       <div class="footer-col-title">Contact</div>
       <p>📍 Str. Daciei nr. 30 · Volovăț</p>
-      <p>📞 0741 406 263</p>
+      <a class="contact-item" href="tel:0741406263">📞 <span>0741 406 263</span></a>
       <a href="mailto:contact@itpex.ro">📧 contact@itpex.ro</a>
       <a href="#programare">📅 Programare online</a>
     </div>
@@ -694,26 +710,13 @@
 
 <div class="toast" id="toast">✅ Programare înregistrată cu succes!</div>
 
-<!-- EmailJS (https://www.emailjs.com/) -->
-<script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
-
 <script>
 const CONFIG = {
-  emailjs_public_key: "u4jUSzcMVJamyT8pe",
-  emailjs_service_id: "itpex108@gmail.com",
-  emailjs_template_id: "template_1yxfsi4",
   whatsapp_number: "0741406263",
-  api_base_url: window.API_BASE_URL || (location.hostname.includes("netlify.app") || location.hostname.includes("itpex.ro") ? "https://itpex-api.onrender.com" : ""),
+  api_base_url: window.API_BASE_URL || (location.hostname ? "https://itpex.onrender.com" : ""),
 };
 
-// EmailJS public key (as requested):
-const EMAILJS_PUBLIC_KEY = CONFIG.emailjs_public_key;
-// TODO: Replace these with your EmailJS service/template IDs
-const EMAILJS_SERVICE_ID = "itpex108@gmail.com";
-const EMAILJS_TEMPLATE_ID = "template_1yxfsi4";
 const API_BASE = CONFIG.api_base_url || "";
-
-    emailjs.init(EMAILJS_PUBLIC_KEY);
 
 const today = new Date();
 let viewYear = today.getFullYear(), viewMonth = today.getMonth();
@@ -724,6 +727,19 @@ const SLOTS = ["08:00","08:45","09:30","10:15","11:00","11:45","13:00","13:45","
 
 let availability = { bookings: [], blocked: {} };
 let backendOnline = true;
+
+function markSlotAsTaken(dateKeyValue, time){
+  if(!dateKeyValue||!time) return;
+  if(!availability.bookings) availability.bookings = [];
+  const exists = availability.bookings.some(b=>b.date===dateKeyValue && b.time===time && b.status!="anulat");
+  if(!exists){
+    availability.bookings.push({ date: dateKeyValue, time, status: "confirmat" });
+  }
+  // dacă utilizatorul se uită chiar la această zi, reafișăm grila ca butonul să devină roșu imediat
+  if(selectedDate && dateKeyValue === dateKey(selectedDate)){
+    showSlots(selectedDate, false);
+  }
+}
 
 async function loadAvailability() {
   try {
@@ -766,12 +782,16 @@ function buildCalendar() {
     const blockedSlots = getBlockedSlotsFor(dk);
     const bookedSlots = getBookedSlotsFor(dk);
     const taken = new Set([...(blockedSlots||[]), ...bookedSlots]);
+    const hasAny = taken.size>0;
     const isFull = SLOTS.every(s=>taken.has(s));
     const isToday=date.toDateString()===today.toDateString();
     const isSel=selectedDate&&date.toDateString()===selectedDate.toDateString();
     if(isPast||isSunday) el.classList.add("past");
     else if(isFull) el.classList.add("full","available");
-    else el.classList.add("available");
+    else {
+      el.classList.add("available");
+      if(hasAny) el.classList.add("partial");
+    }
     if(isToday) el.classList.add("today");
     if(isSel) el.classList.add("selected");
     if(!isPast&&!isSunday) el.addEventListener("click",()=>selectDate(date,isFull,taken));
@@ -855,7 +875,10 @@ async function createBookingOnServer(booking){
   });
   if(!res.ok){
     const err = await res.json().catch(()=>({error:"Eroare server"}));
-    throw new Error(err.error || "Eroare server");
+    const msg = err.error || "Eroare server";
+    // Dacă slotul tocmai a fost luat de altcineva, serverul întoarce 409.
+    if(res.status === 409) throw new Error("Interval deja ocupat");
+    throw new Error(msg);
   }
   return res.json();
 }
@@ -863,7 +886,7 @@ async function createBookingOnServer(booking){
 document.getElementById("btnBook").addEventListener("click",async ()=>{
   const nume=document.getElementById("fNume").value.trim();
   const tel=document.getElementById("fTel").value.trim();
-  const email=document.getElementById("fEmail").value.trim();
+  const emailInput=document.getElementById("fEmail").value.trim();
   const nrAuto=document.getElementById("fNrAuto").value.trim().toUpperCase();
   const marcaModel=document.getElementById("fMarcaModel").value.trim().toUpperCase();
   const combustibil=document.getElementById("fCombustibil").value.trim();
@@ -882,7 +905,7 @@ document.getElementById("btnBook").addEventListener("click",async ()=>{
     id: "b"+Date.now()+Math.random().toString(16).slice(2,6),
     name: nume,
     phone: tel,
-    email,
+    email: emailInput || null,
     plate: nrAuto,
     service: "ITP autoturisme",
     status: "confirmat",
@@ -898,35 +921,19 @@ document.getElementById("btnBook").addEventListener("click",async ()=>{
     createdAt: new Date().toISOString()
   };
 
-  let serverSaved = false;
+  let saved = null;
   try {
-    const { booking: saved } = await createBookingOnServer(booking);
-    availability.bookings = [...(availability.bookings||[]), { date:saved.date, time:saved.time, status:saved.status }];
-    serverSaved = true;
+    const res = await createBookingOnServer(booking);
+    saved = res.booking;
+    markSlotAsTaken(saved.date, saved.time);
   } catch(err){
-    console.warn("Server indisponibil, continuăm cu trimiterea prin email:", err.message || err);
-  }
-
-  // Trimitem email de confirmare (best-effort)
-  const payload = {
-    name: booking.name,
-    client: booking.name,
-    client_name: booking.name,
-    phone: booking.phone,
-    tel: booking.phone,
-    client_phone: booking.phone,
-    email: booking.email || "-",
-    client_email: booking.email || "-",
-    plate: booking.plate,
-    nr_auto: booking.plate,
-    service: booking.service,
-    date: booking.dateText,
-    time: booking.time,
-    notes: booking.notes || "-",
-    message: `Client: ${booking.name}\nTelefon: ${booking.phone}\nEmail: ${booking.email||"-"}\nNr auto: ${booking.plate}\nData: ${booking.dateText}\nOra: ${booking.time}\nServiciu: ${booking.service}\nObs: ${booking.notes||"-"}`
-  };
-  if(window.emailjs){
-    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, payload).catch(()=>{});
+    const msg = err?.message || "Nu am putut salva programarea pe server. Încearcă din nou în câteva momente.";
+    if(msg === "offline"){
+      alert("Serverul este indisponibil momentan. Reîncearcă în câteva momente ca să blocăm intervalul.");
+    } else {
+      alert(msg);
+    }
+    return;
   }
 
   const dateLabel=formatDateLabel(dataVal);
@@ -940,9 +947,7 @@ document.getElementById("btnBook").addEventListener("click",async ()=>{
     const map={email:"Email",sms:"SMS",whatsapp:"WhatsApp"};
     reminderLine = '🔔 Reminder expirare: <strong>Cu 7 zile înainte</strong> pe <strong>'+(map[reminderChannel]||"canalul ales")+'</strong><br>';
   }
-  const confirmLine = serverSaved
-    ? 'Vei primi o confirmare pe <strong>'+( email||tel)+'</strong>.'
-    : 'Serverul este momentan indisponibil, dar ți-am trimis detaliile prin email și te vom contacta pentru confirmare.';
+  const confirmLine = 'Vei primi o confirmare pe <strong>'+( emailInput || tel )+'</strong>.';
 
   document.getElementById("successDetails").innerHTML=
     '<strong>'+nume+'</strong>, programarea ta a fost înregistrată!<br><br>'+
@@ -987,7 +992,10 @@ const nav = document.querySelector('nav');
 const navToggle = document.querySelector('.nav-toggle');
 if(nav && navToggle){
   navToggle.addEventListener('click',()=>nav.classList.toggle('open'));
-  document.addEventListener('click',e=>{ if(!e.target.closest('nav')) nav.classList.remove('open'); });
+  document.addEventListener('click',e=>{
+    if(!(e.target instanceof Element)) return;
+    if(!e.target.closest('nav')) nav.classList.remove('open');
+  });
   document.querySelectorAll('.nav-links a').forEach(a=>a.addEventListener('click',()=>nav.classList.remove('open')));
 }
 
