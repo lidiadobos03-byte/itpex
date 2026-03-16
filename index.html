@@ -506,7 +506,7 @@
 <section id="programare">
   <div class="section-label">Programare</div>
   <div class="section-title">Rezervă-ți locul în 30 de secunde</div>
-  <p class="section-sub">Selectează data și ora. Confirmarea vine instant.</p>
+  <p class="section-sub">Selectează data și ora. Te contactăm rapid pentru confirmare.</p>
 
   <div class="booking-wrap">
     <div class="calendar-panel reveal">
@@ -943,9 +943,7 @@ document.getElementById("btnBook").addEventListener("click",async ()=>{
     const map={email:"Email",sms:"SMS",whatsapp:"WhatsApp"};
     reminderLine = '🔔 Reminder expirare: <strong>Cu 7 zile înainte</strong> pe <strong>'+(map[reminderChannel]||"canalul ales")+'</strong><br>';
   }
-  const confirmLine = emailInput
-    ? 'Vei primi o confirmare pe <strong>'+ emailInput +'</strong>.'
-    : 'Te contactăm la <strong>'+ tel +'</strong> pentru confirmare.';
+  const confirmLine = 'Am înregistrat solicitarea. Te contactăm pentru confirmare.';
 
   document.getElementById("successDetails").innerHTML=
     '<strong>'+nume+'</strong>, programarea ta a fost înregistrată!<br><br>'+
