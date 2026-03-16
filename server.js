@@ -6,7 +6,6 @@ const fs = require("fs/promises");
 const crypto = require("crypto");
 const ExcelJS = require("exceljs");
 const nodemailer = require("nodemailer");
-const twilio = require("twilio");
 
 const DATA_DIR = path.join(__dirname, "data");
 const DATA_FILE = path.join(DATA_DIR, "store.json");
@@ -21,14 +20,9 @@ const SMTP_SECURE = String(process.env.SMTP_SECURE || "").toLowerCase() === "tru
 const MAIL_TO = process.env.MAIL_TO || process.env.ADMIN_EMAIL;
 const MAIL_FROM = process.env.MAIL_FROM || SMTP_USER;
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || process.env.FRONTEND_ORIGIN;
-const TWILIO_SID = process.env.TWILIO_ACCOUNT_SID;
-const TWILIO_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_SMS_FROM = process.env.TWILIO_SMS_FROM;
-const TWILIO_WA_FROM = process.env.TWILIO_WHATSAPP_FROM;
 
 let mailer = null;
 let emailWarningShown = false;
-let smsClient = null;
 
 function getMailer() {
   if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS || !MAIL_TO) return null;
@@ -41,12 +35,6 @@ function getMailer() {
     });
   }
   return mailer;
-}
-
-function getSmsClient() {
-  if (!TWILIO_SID || !TWILIO_TOKEN) return null;
-  if (!smsClient) smsClient = twilio(TWILIO_SID, TWILIO_TOKEN);
-  return smsClient;
 }
 
 async function buildBookingExcel(booking) {
@@ -152,44 +140,6 @@ async function sendClientEmail(booking) {
   } catch (err) {
     console.warn("⚠️  Nu am putut trimite emailul de confirmare către client:", err.message);
   }
-}
-
-function formatPhoneE164(phone) {
-  if (!phone) return null;
-  const digits = String(phone).replace(/\D/g, "");
-  if (!digits) return null;
-  if (digits.startsWith("0")) {
-    return "+4" + digits.slice(1); // Români: 07xx -> +407xx
-  }
-  if (digits.startsWith("40")) return "+" + digits;
-  if (digits.startsWith("+")) return digits;
-  return "+" + digits;
-}
-
-async function sendBookingSms(booking) {
-  if (!TWILIO_SMS_FROM) return;
-  const client = getSmsClient();
-  if (!client) return;
-  const to = formatPhoneE164(booking.phone);
-  if (!to) return;
-  const body = [
-    "ITPEX – solicitare programare ITP",
-    `Data: ${booking.dateText || booking.date}`,
-    `Ora: ${booking.time}`,
-    `Nr auto: ${booking.plate}`,
-    "Te contactăm pentru confirmare. Tel: 0741 406 263"
-  ].join("\n");
-  await client.messages.create({ from: TWILIO_SMS_FROM, to, body });
-}
-
-async function sendBookingWhatsapp(booking) {
-  if (!TWILIO_WA_FROM) return;
-  const client = getSmsClient();
-  if (!client) return;
-  const to = formatPhoneE164(booking.phone);
-  if (!to) return;
-  const body = `ITPEX – solicitare programare ITP\n${booking.dateText || booking.date} ${booking.time}\nNr auto: ${booking.plate}\nTe contactăm pentru confirmare.`;
-  await client.messages.create({ from: `whatsapp:${TWILIO_WA_FROM}`, to: `whatsapp:${to}`, body });
 }
 
 if (!ADMIN_PASS) {
@@ -304,8 +254,6 @@ app.post("/api/bookings", async (req, res) => {
   await writeStore(store);
   sendBookingEmail(newBooking).catch(() => {});
   sendClientEmail(newBooking).catch(() => {});
-  sendBookingSms(newBooking).catch(() => {});
-  sendBookingWhatsapp(newBooking).catch(() => {});
   res.json({ ok: true, booking: newBooking });
 });
 
