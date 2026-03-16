@@ -782,16 +782,12 @@ function buildCalendar() {
     const blockedSlots = getBlockedSlotsFor(dk);
     const bookedSlots = getBookedSlotsFor(dk);
     const taken = new Set([...(blockedSlots||[]), ...bookedSlots]);
-    const hasAny = taken.size>0;
     const isFull = SLOTS.every(s=>taken.has(s));
     const isToday=date.toDateString()===today.toDateString();
     const isSel=selectedDate&&date.toDateString()===selectedDate.toDateString();
     if(isPast||isSunday) el.classList.add("past");
     else if(isFull) el.classList.add("full","available");
-    else {
-      el.classList.add("available");
-      if(hasAny) el.classList.add("partial");
-    }
+    else el.classList.add("available");
     if(isToday) el.classList.add("today");
     if(isSel) el.classList.add("selected");
     if(!isPast&&!isSunday) el.addEventListener("click",()=>selectDate(date,isFull,taken));
@@ -947,7 +943,9 @@ document.getElementById("btnBook").addEventListener("click",async ()=>{
     const map={email:"Email",sms:"SMS",whatsapp:"WhatsApp"};
     reminderLine = '🔔 Reminder expirare: <strong>Cu 7 zile înainte</strong> pe <strong>'+(map[reminderChannel]||"canalul ales")+'</strong><br>';
   }
-  const confirmLine = 'Vei primi o confirmare pe <strong>'+( emailInput || tel )+'</strong>.';
+  const confirmLine = emailInput
+    ? 'Vei primi o confirmare pe <strong>'+ emailInput +'</strong>.'
+    : 'Te contactăm la <strong>'+ tel +'</strong> pentru confirmare.';
 
   document.getElementById("successDetails").innerHTML=
     '<strong>'+nume+'</strong>, programarea ta a fost înregistrată!<br><br>'+
