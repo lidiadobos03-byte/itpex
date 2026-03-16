@@ -10,6 +10,7 @@ const Redis = require("ioredis");
 
 const DATA_DIR = path.join(__dirname, "data");
 const DATA_FILE = path.join(DATA_DIR, "store.json");
+const EXCEL_FILE = path.join(DATA_DIR, "programari-itp.xlsx");
 const ADMIN_PASS = process.env.ADMIN_PASS || process.env.ADMIN_PASSWORD;
 const ADMIN_KEY = process.env.ADMIN_KEY || process.env.ADMIN_TOKEN;
 const SESSION_SECRET = process.env.SESSION_SECRET || "change-this-session-secret";
@@ -98,6 +99,30 @@ async function buildBookingsExcel(bookings = []) {
   return wb.xlsx.writeBuffer();
 }
 
+function ensurePermanentBlocks(store) {
+  const normalized = {
+    bookings: Array.isArray(store?.bookings) ? store.bookings : [],
+    blocked: store?.blocked && typeof store.blocked === "object" ? store.blocked : {},
+  };
+
+  normalized.bookings.forEach((booking) => {
+    if (!booking?.date || !booking?.time) return;
+    if (!normalized.blocked[booking.date]) normalized.blocked[booking.date] = [];
+    if (!normalized.blocked[booking.date].includes(booking.time)) {
+      normalized.blocked[booking.date].push(booking.time);
+    }
+  });
+
+  return normalized;
+}
+
+async function writeExcelSnapshot(bookings = []) {
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  const excelBuffer = await buildBookingsExcel(bookings);
+  await fs.writeFile(EXCEL_FILE, Buffer.from(excelBuffer));
+  return excelBuffer;
+}
+
 async function sendBookingEmail(booking) {
   const transport = getMailer();
   if (!transport) {
@@ -110,7 +135,7 @@ async function sendBookingEmail(booking) {
 
   try {
     const store = await readStore();
-    const excelBuffer = await buildBookingsExcel(store.bookings || []);
+    const excelBuffer = await writeExcelSnapshot(store.bookings || []);
     const subject = `Programare ITP ${booking.date} ${booking.time} — ${booking.name}`;
     const text = [
       `Nume: ${booking.name}`,
@@ -180,7 +205,7 @@ async function readStore() {
   if (client) {
     try {
       const raw = await client.get(STORE_KEY);
-      if (raw) return JSON.parse(raw);
+      if (raw) return ensurePermanentBlocks(JSON.parse(raw));
     } catch (err) {
       console.warn("ℹ️ Redis read fallback to file:", err.message);
     }
@@ -188,7 +213,7 @@ async function readStore() {
   await fs.mkdir(DATA_DIR, { recursive: true });
   try {
     const raw = await fs.readFile(DATA_FILE, "utf8");
-    return JSON.parse(raw || '{"bookings":[],"blocked":{}}');
+    return ensurePermanentBlocks(JSON.parse(raw || '{"bookings":[],"blocked":{}}'));
   } catch {
     const init = { bookings: [], blocked: {} };
     await fs.writeFile(DATA_FILE, JSON.stringify(init, null, 2), "utf8");
@@ -197,17 +222,18 @@ async function readStore() {
 }
 
 async function writeStore(store) {
+  const normalized = ensurePermanentBlocks(store);
   const client = getRedis();
   if (client) {
     try {
-      await client.set(STORE_KEY, JSON.stringify(store));
-      return;
+      await client.set(STORE_KEY, JSON.stringify(normalized));
     } catch (err) {
       console.warn("ℹ️ Redis write fallback to file:", err.message);
     }
   }
   await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(DATA_FILE, JSON.stringify(store, null, 2), "utf8");
+  await fs.writeFile(DATA_FILE, JSON.stringify(normalized, null, 2), "utf8");
+  await writeExcelSnapshot(normalized.bookings || []);
 }
 
 function requireAuth(req, res, next) {
@@ -285,7 +311,7 @@ app.post("/api/bookings", async (req, res) => {
   const store = await readStore();
   const isTaken =
     (store.blocked?.[booking.date] || []).includes(booking.time) ||
-    store.bookings.some((b) => b.date === booking.date && b.time === booking.time && b.status !== "anulat");
+    store.bookings.some((b) => b.date === booking.date && b.time === booking.time);
   if (isTaken) return res.status(409).json({ ok: false, error: "Interval deja ocupat" });
 
   const newBooking = {
@@ -295,6 +321,10 @@ app.post("/api/bookings", async (req, res) => {
     createdAt: new Date().toISOString(),
   };
   store.bookings.push(newBooking);
+  if (!store.blocked[booking.date]) store.blocked[booking.date] = [];
+  if (!store.blocked[booking.date].includes(booking.time)) {
+    store.blocked[booking.date].push(booking.time);
+  }
   await writeStore(store);
   sendBookingEmail(newBooking).catch(() => {});
   sendClientEmail(newBooking).catch(() => {});
@@ -356,4 +386,7 @@ app.get(/.*/, (_req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ ITPEX server pornit pe http://localhost:${PORT}`);
+  readStore()
+    .then((store) => writeExcelSnapshot(store.bookings || []))
+    .catch((err) => console.warn("⚠️  Nu am putut inițializa Excel-ul cu programări:", err.message));
 });

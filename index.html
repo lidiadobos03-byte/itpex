@@ -777,7 +777,7 @@ let backendOnline = true;
 function markSlotAsTaken(dateKeyValue, time){
   if(!dateKeyValue||!time) return;
   if(!availability.bookings) availability.bookings = [];
-  const exists = availability.bookings.some(b=>b.date===dateKeyValue && b.time===time && b.status!="anulat");
+  const exists = availability.bookings.some(b=>b.date===dateKeyValue && b.time===time);
   if(!exists){
     availability.bookings.push({ date: dateKeyValue, time, status: "confirmat" });
   }
@@ -806,7 +806,7 @@ function getBlockedSlotsFor(dateKey){
   return (availability.blocked && availability.blocked[dateKey]) || [];
 }
 function getBookedSlotsFor(dateKey){
-  return (availability.bookings || []).filter(b=>b.date===dateKey && b.status!=="anulat").map(b=>b.time);
+  return (availability.bookings || []).filter(b=>b.date===dateKey).map(b=>b.time);
 }
 function dateKey(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
 
