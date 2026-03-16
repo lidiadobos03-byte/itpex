@@ -16,6 +16,7 @@ const SESSION_SECRET = process.env.SESSION_SECRET || "change-this-session-secret
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const RESEND_FROM = process.env.RESEND_FROM || process.env.MAIL_FROM;
 const MAIL_TO = process.env.MAIL_TO || process.env.ADMIN_EMAIL;
+const SUPPORT_PHONE = process.env.SUPPORT_PHONE || process.env.PHONE || "0741 406 263";
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || process.env.FRONTEND_ORIGIN;
 const REDIS_URL = process.env.REDIS_URL;
 
@@ -155,7 +156,7 @@ async function sendClientEmail(booking) {
       `Observații: ${booking.notes || "-"}`,
       ``,
       `Ne vedem la ITPEX, Str. Daciei nr. 30.`,
-      `Dacă ai întrebări, sună-ne la ${MAIL_TO || "0741 406 263"}.`,
+      `Dacă ai întrebări, sună-ne la ${SUPPORT_PHONE}.`,
     ].join("\n");
     await transport.emails.send({
       from: RESEND_FROM,
