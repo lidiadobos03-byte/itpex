@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITPEX — Stație ITP Autorizată</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green-dark:  #1a4d2e;
+    --green-mid:   #1e5c35;
+    --green-brand: #2d7a47;
+    --green-light: #3a9658;
+    --green-pale:  #e8f5ec;
+    --green-ultra: #f0f9f3;
+    --green-glow:  rgba(45,122,71,0.15);
+    --black:       #0d1410;
+    --gray-900:    #1a1f1c;
+    --gray-700:    #374151;
+    --gray-500:    #6b7280;
+    --gray-300:    #d1d5db;
+    --gray-100:    #f3f4f6;
+    --white:       #ffffff;
+    --accent:      #1a4d2e;
+    --radius:      12px;
+    --shadow:      0 4px 24px rgba(26,77,46,0.10);
+    --shadow-lg:   0 16px 56px rgba(26,77,46,0.15);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Manrope', sans-serif; background: var(--white); color: var(--black); overflow-x: hidden; }
+
+  /* ── NAVBAR ── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 999;
+    background: linear-gradient(90deg, #ffffff 0 50%, rgba(10,12,11,0.65) 50% 100%);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    backdrop-filter: blur(10px);
+    padding: 0 5vw; height: 80px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 2px 24px rgba(0,0,0,0.35);
+  }
+  .nav-logo { display: flex; align-items: center; gap: 14px; text-decoration: none; }
+  .nav-logo img { height: 78px; width: auto; object-fit: contain; transform: scaleX(1.15); transform-origin: left center; }
+  .nav-logo-text { font-size: 12px; color: #1a1f1c; font-weight: 600; letter-spacing: 0.2px; }
+  .nav-toggle {
+    display: none;
+    background: transparent; border: none; cursor: pointer;
+    padding: 10px; margin-left: 12px; color: var(--white); font-size: 22px;
+  }
+  .nav-links { display: flex; gap: 10px; align-items: center; }
+  .nav-links a {
+    font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.88);
+    text-decoration: none; padding: 10px 14px; border-radius: 10px; transition: all 0.18s;
+  }
+  .nav-links a:hover { color: var(--white); background: rgba(255,255,255,0.12); }
+  .nav-cta {
+    background: var(--white) !important; color: var(--black) !important;
+    font-weight: 800 !important; padding: 8px 20px !important; border-radius: 999px !important;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  }
+  .nav-cta:hover { background: #f3f4f6 !important; transform: translateY(-1px); }
+  
+  @media(max-width: 900px){
+    nav{
+      background: rgba(8,10,9,0.78);
+      padding: 0 16px;
+      height: 68px;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.35);
+    }
+    .nav-logo img{height:56px; transform:none;}
+    .nav-logo-text{color:#fff;}
+    .nav-toggle{display:block;}
+    .nav-links{
+      position: absolute;
+      top: 68px; left:0; right:0;
+      background: rgba(8,10,9,0.92);
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      padding: 12px 16px 16px;
+      display: none;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    nav.open .nav-links{display:flex;}
+    .nav-links a{
+      width: 100%;
+      color: rgba(255,255,255,0.9);
+      padding: 10px 0;
+    }
+    .nav-cta{
+      background: #fff !important;
+      color: #0d1410 !important;
+      align-self: stretch;
+      text-align: center;
+      box-shadow: none;
+    }
+    .hero{padding:120px 5vw 84px;}
+  }
+
+  /* ── HERO ── */
+  .hero {
+    min-height: 100vh; display: flex; align-items: center;
+    padding: 140px 5vw 84px; position: relative; overflow: hidden;
+    background:
+      linear-gradient(90deg, rgba(8,10,9,0.78) 0%, rgba(8,10,9,0.62) 40%, rgba(8,10,9,0.2) 70%, rgba(8,10,9,0) 100%),
+      url('https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1600&q=80') center/cover no-repeat;
+  }
+  .hero-overlay {
+    position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.35));
+    pointer-events: none;
+  }
+  .hero-content {
+    position: relative; z-index: 1;
+    max-width: 1200px; margin: 0 auto; width: 100%;
+  }
+  .hero-tag {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 999px; padding: 6px 16px; font-size: 12px;
+    letter-spacing: 1px; text-transform: uppercase; font-weight: 700; color: var(--white);
+    margin-bottom: 18px;
+  }
+  @keyframes pulse {
+    0%,100% { opacity:1; transform:scale(1); }
+    50% { opacity:0.4; transform:scale(0.75); }
+  }
+  .hero h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(58px, 8.2vw, 120px); font-weight: 400;
+    line-height: 0.95; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--white); margin-bottom: 18px;
+    text-shadow: 0 14px 28px rgba(0,0,0,0.45);
+  }
+  .hero-sub {
+    font-size: 18px; color: rgba(255,255,255,0.8); line-height: 1.7;
+    max-width: 520px; margin-bottom: 32px;
+    text-shadow: 0 10px 22px rgba(0,0,0,0.45);
+  }
+  .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--white); color: var(--black);
+    font-weight: 800; font-size: 16px; padding: 14px 28px;
+    border-radius: 999px; border: none; cursor: pointer;
+    text-decoration: none; transition: all 0.22s;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.35); font-family: 'Manrope', sans-serif;
+  }
+  .btn-primary:hover { background: #f3f4f6; transform: translateY(-2px); }
+  .btn-secondary {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--white); color: var(--green-brand);
+    font-weight: 700; font-size: 14px; padding: 10px 20px;
+    border-radius: 999px; border: 2px solid var(--green-brand);
+    cursor: pointer; text-decoration: none; transition: all 0.22s;
+    font-family: 'Manrope', sans-serif;
+  }
+  .btn-secondary:hover { background: var(--green-ultra); transform: translateY(-1px); }
+
+  .hero-stats { display: none; }
+  .hero-visual { display: none; }
+  .check-list { display: flex; flex-direction: column; gap: 8px; }
+  .check-item {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--green-ultra); border-radius: 9px;
+    padding: 10px 13px; font-size: 13.5px; color: var(--gray-700);
+    border: 1px solid rgba(45,122,71,0.1);
+    animation: slideIn 0.5s both;
+  }
+  @keyframes slideIn { from { opacity:0; transform:translateX(16px); } to { opacity:1; transform:translateX(0); } }
+  .check-item:nth-child(1){animation-delay:0.1s}
+  .check-item:nth-child(2){animation-delay:0.2s}
+  .check-item:nth-child(3){animation-delay:0.3s}
+  .check-item:nth-child(4){animation-delay:0.4s}
+  .check-ok {
+    margin-left: auto; background: rgba(45,122,71,0.12); color: var(--green-brand);
+    font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 20px;
+  }
+
+  /* ── SECTIONS ── */
+  section { padding: 84px 5vw; }
+  .section-label {
+    font-size: 12px; font-weight: 800; color: var(--green-brand);
+    text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-label::before {
+    content: ''; display: block; width: 24px; height: 2.5px; background: var(--green-brand); border-radius: 2px;
+  }
+  .section-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(32px, 4vw, 52px); font-weight: 900; text-transform: uppercase;
+    letter-spacing: -0.5px; line-height: 1; margin-bottom: 14px; color: var(--black);
+  }
+  .section-sub { font-size: 16px; color: var(--gray-500); max-width: 500px; line-height: 1.7; margin-bottom: 48px; }
+
+  /* ── SERVICII ── */
+  #servicii { background: var(--gray-100); }
+  .services-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; max-width: 1100px; margin: 0 auto; }
+  .service-card {
+    background: var(--white); border: 1.5px solid rgba(45,122,71,0.12);
+    border-radius: 18px; padding: 28px; transition: all 0.25s; position: relative; overflow: hidden;
+  }
+  .service-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    background: linear-gradient(90deg, var(--green-brand), var(--green-light));
+    opacity: 0; transition: opacity 0.25s;
+  }
+  .service-card:hover { border-color: var(--green-brand); transform: translateY(-5px); box-shadow: var(--shadow-lg); }
+  .service-card:hover::before { opacity: 1; }
+  .service-icon { font-size: 38px; margin-bottom: 14px; display: block; }
+  .service-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 21px; font-weight: 900; text-transform: uppercase;
+    letter-spacing: 0.3px; margin-bottom: 8px; color: var(--black);
+  }
+  .service-desc { font-size: 14px; color: var(--gray-500); line-height: 1.65; margin-bottom: 18px; }
+  .service-price {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px; font-weight: 900; color: var(--green-brand);
+  }
+  .service-price span { font-size: 13px; color: var(--gray-500); font-family: 'Manrope', sans-serif; font-weight: 400; }
+
+  .docs-card {
+    margin-top: 18px;
+    padding: 20px;
+    border-radius: 14px;
+    border: 1.5px dashed rgba(45,122,71,0.35);
+    background: var(--green-ultra);
+  }
+  .docs-title {
+    font-weight: 800;
+    color: var(--green-dark);
+    margin-bottom: 10px;
+    font-size: 14px;
+    letter-spacing: 0.3px;
+  }
+  .docs-list { list-style: none; display: grid; gap: 6px; padding-left: 0; }
+  .docs-list li {
+    font-size: 13.5px;
+    color: var(--gray-700);
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .docs-bullet {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green-brand); margin-top: 6px; flex-shrink: 0;
+    box-shadow: 0 0 0 5px rgba(45,122,71,0.12);
+  }
+
+  /* ── CALENDAR / BOOKING ── */
+  #programare { background: var(--white); }
+  .booking-wrap { max-width: 1000px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+  .calendar-panel, .slots-panel {
+    background: var(--white); border: 1.5px solid rgba(45,122,71,0.18);
+    border-radius: 20px; padding: 28px; box-shadow: var(--shadow);
+  }
+  .calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .cal-nav-btn {
+    background: var(--green-ultra); border: 1.5px solid rgba(45,122,71,0.18);
+    color: var(--green-dark); width: 34px; height: 34px; border-radius: 8px;
+    cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+  }
+  .cal-nav-btn:hover { background: var(--green-brand); color: var(--white); border-color: var(--green-brand); }
+  .cal-month {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px; font-weight: 900; text-transform: uppercase; color: var(--black);
+  }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+  .cal-day-label { text-align: center; font-size: 11px; font-weight: 800; color: var(--gray-500); text-transform: uppercase; padding: 4px 0 10px; }
+  .cal-day {
+    aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+    border-radius: 8px; font-size: 13.5px; font-weight: 500;
+    cursor: pointer; transition: all 0.15s; position: relative; color: var(--black);
+  }
+  .cal-day:hover:not(.empty):not(.past) { background: var(--green-pale); color: var(--green-dark); }
+  .cal-day.empty { cursor: default; }
+  .cal-day.past { color: var(--gray-300); cursor: not-allowed; }
+  .cal-day.today { border: 2px solid var(--green-brand); color: var(--green-brand); font-weight: 700; }
+  .cal-day.selected { background: var(--green-brand); color: var(--white); font-weight: 800; box-shadow: 0 4px 14px rgba(45,122,71,0.4); }
+  .cal-day.available::after {
+    content: ''; position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%);
+    width: 4px; height: 4px; border-radius: 50%; background: var(--green-brand);
+  }
+  .cal-day.partial::after {
+    content: ''; position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%);
+    width: 6px; height: 6px; border-radius: 50%; background: #ef4444;
+    box-shadow: 0 0 0 4px rgba(239,68,68,0.15);
+  }
+  .cal-day.selected::after { background: var(--white); }
+  .cal-day.full { color: var(--gray-300); cursor: not-allowed; }
+  .cal-day.full::after { background: #ef4444; opacity: 0.6; }
+
+  .slots-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px; font-weight: 900; text-transform: uppercase;
+    margin-bottom: 18px; color: var(--green-brand);
+  }
+  .slots-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 22px; }
+  .slot-btn {
+    background: var(--green-ultra); border: 1.5px solid rgba(45,122,71,0.15);
+    border-radius: 9px; color: var(--gray-700); font-size: 14px; font-weight: 600;
+    padding: 11px 8px; cursor: pointer; transition: all 0.18s; text-align: center;
+    font-family: 'Manrope', sans-serif;
+  }
+  .slot-btn:hover:not(.slot-full) { background: var(--green-pale); border-color: var(--green-brand); color: var(--green-dark); }
+  .slot-btn.slot-selected { background: var(--green-brand); border-color: var(--green-brand); color: var(--white); font-weight: 700; box-shadow: 0 4px 14px rgba(45,122,71,0.3); }
+  .slot-btn.slot-full {
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: #ef4444;
+    cursor: not-allowed;
+    position: relative;
+  }
+  .slot-full-label { font-size: 10px; color: #ef4444; display: block; font-weight: 700; }
+
+  .form-group { margin-bottom: 12px; }
+  .form-section-title {
+    font-size: 12.5px; font-weight: 900; color: var(--gray-700);
+    text-transform: uppercase; letter-spacing: 0.6px;
+    margin: 18px 0 10px;
+  }
+  .form-group label { display: block; font-size: 11.5px; font-weight: 800; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+  .form-input {
+    width: 100%; padding: 11px 14px; background: var(--white);
+    border: 1.5px solid var(--gray-300); border-radius: 9px;
+    color: var(--black); font-size: 14px; font-family: 'Manrope', sans-serif;
+    outline: none; transition: all 0.18s;
+  }
+  .form-input:focus { border-color: var(--green-brand); box-shadow: 0 0 0 3px rgba(45,122,71,0.12); }
+  .form-input::placeholder { color: var(--gray-300); }
+  select.form-input option { background: var(--white); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-check { display: flex; align-items: flex-start; gap: 10px; }
+  .form-check input { margin-top: 2px; }
+  .form-check span { font-size: 13px; color: var(--gray-700); line-height: 1.4; text-transform: none; letter-spacing: 0; font-weight: 600; }
+
+  .booking-summary {
+    background: var(--green-ultra); border: 1.5px solid rgba(45,122,71,0.2);
+    border-radius: 11px; padding: 14px 16px; margin-bottom: 14px;
+    font-size: 13px; color: var(--gray-500); line-height: 1.9;
+  }
+  .booking-summary strong { color: var(--black); }
+  .booking-summary .sum-row { display: flex; justify-content: space-between; }
+
+  .btn-book {
+    width: 100%; padding: 14px; background: var(--green-brand);
+    color: var(--white); font-weight: 800; font-size: 15px;
+    border: none; border-radius: var(--radius); cursor: pointer;
+    font-family: 'Manrope', sans-serif; text-transform: uppercase; letter-spacing: 0.5px;
+    transition: all 0.22s; box-shadow: 0 6px 20px rgba(45,122,71,0.3);
+  }
+  .btn-book:hover { background: var(--green-dark); transform: translateY(-2px); box-shadow: 0 10px 28px rgba(26,77,46,0.35); }
+
+  .booking-success { text-align: center; padding: 40px 20px; display: none; }
+  .booking-success .success-icon { font-size: 64px; margin-bottom: 16px; }
+  .booking-success h3 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px; font-weight: 900; text-transform: uppercase;
+    margin-bottom: 10px; color: var(--green-brand);
+  }
+  .booking-success p { font-size: 14px; color: var(--gray-500); line-height: 1.8; }
+
+  /* ── DE CE NOI ── */
+  #despre { background: var(--green-ultra); }
+  .why-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; max-width: 1100px; margin: 0 auto; }
+  .why-card {
+    background: var(--white); border: 1.5px solid rgba(45,122,71,0.12);
+    border-radius: 16px; padding: 28px 22px; text-align: center; transition: all 0.22s;
+    box-shadow: 0 2px 12px rgba(45,122,71,0.06);
+  }
+  .why-card:hover { border-color: var(--green-brand); transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+  .why-icon { font-size: 40px; margin-bottom: 14px; }
+  .why-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 19px; font-weight: 900; text-transform: uppercase;
+    margin-bottom: 8px; color: var(--black);
+  }
+  .why-text { font-size: 13.5px; color: var(--gray-500); line-height: 1.65; }
+
+  /* ── FOOTER ── */
+  footer {
+    background: var(--green-dark);
+    border-top: none; padding: 56px 5vw 28px;
+  }
+  .footer-grid {
+    display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 48px;
+    max-width: 1100px; margin: 0 auto;
+    padding-bottom: 40px; border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .footer-logo img {
+    height: 180px; width: auto; margin-bottom: 12px;
+    background: #fff; padding: 12px 40px; border-radius: 10px;
+  }
+  .footer-desc { font-size: 14px; color: rgba(255,255,255,0.6); line-height: 1.7; max-width: 260px; }
+  .footer-col-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 14px; font-weight: 900; text-transform: uppercase;
+    letter-spacing: 1px; color: rgba(255,255,255,0.5); margin-bottom: 16px;
+  }
+  .footer-col a, .footer-col p {
+    display: block; font-size: 14px; color: rgba(255,255,255,0.8);
+    text-decoration: none; margin-bottom: 9px; transition: color 0.2s; line-height: 1.5;
+  }
+  .footer-col a:hover { color: var(--white); }
+  .contact-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .footer-bottom {
+    max-width: 1100px; margin: 24px auto 0;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12.5px; color: rgba(255,255,255,0.35);
+  }
+
+  /* Legend */
+  .cal-legend { display: flex; gap: 16px; margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(45,122,71,0.12); }
+  .cal-legend span { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--gray-500); }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 28px; right: 28px; z-index: 9999;
+    background: linear-gradient(135deg, var(--green-brand), var(--green-dark));
+    color: var(--white); padding: 14px 20px; border-radius: 12px;
+    font-size: 14px; font-weight: 600; font-family: 'Manrope', sans-serif;
+    box-shadow: 0 8px 32px rgba(26,77,46,0.3);
+    transform: translateY(80px); opacity: 0;
+    transition: all 0.38s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  /* Scroll reveal */
+  .reveal { opacity: 0; transform: translateY(28px); transition: all 0.6s cubic-bezier(0.16,1,0.3,1); }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+
+  @media (max-width: 768px) {
+    .hero-content { grid-template-columns: 1fr; gap: 36px; }
+    .hero { padding-top: 120px; }
+    .booking-wrap { grid-template-columns: 1fr; }
+    .footer-grid { grid-template-columns: 1fr; gap: 28px; }
+    .form-row { grid-template-columns: 1fr; }
+    .hero-stats { gap: 20px; flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="#" class="nav-logo" aria-label="ITPEX — Acasă">
+    <img src="logo.png" alt="ITPEX">
+    <span class="nav-logo-text">Stație ITP autorizată</span>
+  </a>
+  <button class="nav-toggle" aria-label="Deschide meniul">☰</button>
+  <div class="nav-links">
+    <a href="#servicii">Servicii</a>
+    <a href="#programare">Programare</a>
+    <a href="#despre">De ce noi</a>
+    <a href="#contact">Contact</a>
+    <a class="nav-cta" href="#programare">Programează-te</a>
+  </div>
+</nav>
+
+<section class="hero" id="acasa">
+  <div class="hero-overlay"></div>
+  <div class="hero-content">
+    <div>
+      <div class="hero-tag">Stație ITP autorizată · Volovăț, jud. Suceava</div>
+      <h1>Siguranță la fiecare drum.</h1>
+      <p class="hero-sub">ITP complet și profesionist, astfel încât tu să mergi liniștit. Programări rapide, verificări corecte și transparență totală.</p>
+      <div class="hero-actions">
+        <a class="btn-primary" href="#programare">Programează-te aici</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="servicii">
+  <div class="section-label">Servicii</div>
+  <div class="section-title">ITP pentru autoturisme</div>
+  <p class="section-sub">Tarif transparent, durată redusă, explicații clare pentru fiecare verificare.</p>
+
+  <div class="services-grid">
+    <div class="service-card reveal">
+      <span class="service-icon">🚘</span>
+      <div class="service-name">Autoturisme</div>
+      <p class="service-desc">ITP complet pentru autoturisme, rapid și corect.</p>
+      <div class="service-price">150 lei <span>/ inspecție</span></div>
+      <div class="docs-card">
+        <div class="docs-title">Acte necesare pentru efectuarea ITP</div>
+        <ul class="docs-list">
+          <li><span class="docs-bullet"></span>Certificatul de înmatriculare (talon) — original sau dovada înlocuitoare</li>
+          <li><span class="docs-bullet"></span>Cartea de identitate a conducătorului auto — original</li>
+          <li><span class="docs-bullet"></span>Polița R.C.A. valabilă la data inspecției — original</li>
+          <li><span class="docs-bullet"></span>Cartea de identitate a autovehiculului (CIV) — original, securizată de R.A.R.</li>
+          <li><span class="docs-bullet"></span>Certificat de agreere taxi — doar pentru taxiuri</li>
+          <li><span class="docs-bullet"></span>Certificat de agreere pentru Școala de șoferi — doar pentru mașinile de școală</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="programare">
+  <div class="section-label">Programare</div>
+  <div class="section-title">Rezervă-ți locul în 30 de secunde</div>
+  <p class="section-sub">Selectează data și ora. Te contactăm rapid pentru confirmare.</p>
+
+  <div class="booking-wrap">
+    <div class="calendar-panel reveal">
+      <div class="calendar-header">
+        <button class="cal-nav-btn" id="prevMonth" aria-label="Luna anterioară">‹</button>
+        <div class="cal-month" id="calMonth">Luna 2025</div>
+        <button class="cal-nav-btn" id="nextMonth" aria-label="Luna următoare">›</button>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div class="cal-legend">
+        <span><span class="cal-day today" style="width:10px;height:10px;border-width:2px"></span> Astăzi</span>
+        <span><span class="cal-day available" style="width:10px;height:10px"></span> Disponibil</span>
+        <span><span class="cal-day full" style="width:10px;height:10px"></span> Complet</span>
+      </div>
+    </div>
+
+    <div class="slots-panel reveal">
+      <div id="bookingContent">
+        <div class="slots-title" id="slotsTitle">← Selectează o dată</div>
+        <div class="slots-grid" id="slotsGrid" style="display:none"></div>
+
+        <div id="bookingForm">
+        <div class="booking-summary" id="bookingSummary"></div>
+
+        <div class="form-section-title">1️⃣ Date de contact</div>
+        <div class="form-group">
+          <label>Nume și prenume *</label>
+          <input class="form-input" id="fNume" placeholder="Ex: Andrei Popescu">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Telefon *</label>
+            <input class="form-input" id="fTel" placeholder="07xx xxx xxx">
+          </div>
+          <div class="form-group">
+            <label>Email (opțional)</label>
+            <input class="form-input" id="fEmail" placeholder="email@exemplu.ro (dacă vrei confirmare pe email)">
+          </div>
+        </div>
+
+        <div class="form-section-title">2️⃣ Datele mașinii</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Număr de înmatriculare *</label>
+            <input class="form-input" id="fNrAuto" placeholder="B 123 ABC">
+          </div>
+          <div class="form-group">
+            <label>Marca și model</label>
+            <input class="form-input" id="fMarcaModel" placeholder="Ex: Dacia Logan">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tip combustibil</label>
+            <select class="form-input" id="fCombustibil">
+              <option value="">Alege tipul</option>
+              <option>Benzină</option>
+              <option>Diesel</option>
+              <option>GPL</option>
+              <option>Hibrid</option>
+              <option>Electric</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>An fabricație (opțional)</label>
+            <input class="form-input" id="fAn" placeholder="Ex: 2016">
+          </div>
+        </div>
+
+        <div class="form-section-title">3️⃣ Programarea</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Data dorită 📅 *</label>
+            <input class="form-input" id="fData" type="date">
+          </div>
+          <div class="form-group">
+            <label>Ora dorită 🕒 *</label>
+            <select class="form-input" id="fOra">
+              <option value="">Alege ora</option>
+              <option>08:00</option>
+              <option>08:45</option>
+              <option>09:30</option>
+              <option>10:15</option>
+              <option>11:00</option>
+              <option>11:45</option>
+              <option>13:00</option>
+              <option>13:45</option>
+              <option>14:30</option>
+              <option>15:15</option>
+              <option>16:00</option>
+              <option>16:45</option>
+              <option>17:30</option>
+              <option>18:15</option>
+              <option>19:00</option>
+              <option>19:45</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-section-title">4️⃣ Observații (opțional)</div>
+        <div class="form-group">
+          <label>Detalii suplimentare</label>
+          <textarea class="form-input" id="fObs" rows="3" placeholder="Ex: ITP expirat / Mașina are GPL / Vin din alt oraș"></textarea>
+        </div>
+
+        <div class="form-section-title">5️⃣ Reminder expirare ITP (opțional)</div>
+        <div class="form-group">
+          <label>Canal preferat pentru notificare</label>
+          <select class="form-input" id="fReminder">
+            <option value="">Alege canalul</option>
+            <option value="email">Email</option>
+            <option value="sms">Mesaj pe telefon (SMS)</option>
+            <option value="whatsapp">WhatsApp</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-check">
+            <input type="checkbox" id="fReminderConsent">
+            <span>Confirm că vreau să primesc pe email sau mesaj pe telefon o notificare cu 7 zile înainte de expirarea ITP-ului.</span>
+          </label>
+        </div>
+
+        <div class="form-section-title">6️⃣ Confirmare GDPR</div>
+        <div class="form-group">
+          <label class="form-check">
+            <input type="checkbox" id="fGdpr">
+            <span>Accept <a href="politica.html">politica de confidențialitate</a> și sunt de acord să primesc confirmarea programării pe mail.</span>
+          </label>
+        </div>
+
+          <button class="btn-book" id="btnBook">Programează-mă la ITP</button>
+        </div>
+      </div>
+
+      <div class="booking-success" id="bookingSuccess">
+        <div class="success-icon">✅</div>
+        <h3>Programare confirmată</h3>
+        <p id="successDetails"></p>
+        <button class="btn-secondary" onclick="resetBooking()">Programează altă oră</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="despre">
+  <div class="section-label">De ce noi</div>
+  <div class="section-title">Profesionalism pe bune</div>
+  <p class="section-sub">Ne concentrăm pe corectitudine, viteză și comunicare clară.</p>
+
+  <div class="why-grid">
+    <div class="why-card reveal">
+      <div class="why-icon">✅</div>
+      <div class="why-title">Autorizare RAR</div>
+      <p class="why-text">Echipamente conforme și proceduri verificate.</p>
+    </div>
+    <div class="why-card reveal">
+      <div class="why-icon">⚡</div>
+      <div class="why-title">Rapid & eficient</div>
+      <p class="why-text">Timp mediu de inspecție: 20-25 minute.</p>
+    </div>
+    <div class="why-card reveal">
+      <div class="why-icon">🧾</div>
+      <div class="why-title">Transparență</div>
+      <p class="why-text">Primești explicații pentru fiecare etapă.</p>
+    </div>
+    <div class="why-card reveal">
+      <div class="why-icon">🤝</div>
+      <div class="why-title">Suport real</div>
+      <p class="why-text">Îți spunem ce poți îmbunătăți înainte de ITP.</p>
+    </div>
+  </div>
+</section>
+
+<footer id="contact">
+  <div class="footer-grid">
+    <div>
+      <div class="footer-logo">
+        <img src="logo.png" alt="ITPEX">
+      </div>
+      <p class="footer-desc">Stație ITP autorizată RAR. Siguranță, profesionalism și transparență la fiecare inspecție.</p>
+    </div>
+    <div class="footer-col">
+      <div class="footer-col-title">Program</div>
+      <p>Luni – Vineri: 08:00 – 20:00</p>
+      <p>Sâmbătă: 08:00 – 20:00</p>
+      <p>Duminică: Închis</p>
+    </div>
+    <div class="footer-col">
+      <div class="footer-col-title">Contact</div>
+      <p>📍 Str. Daciei nr. 30 · Volovăț</p>
+      <a class="contact-item" href="tel:0741406263">📞 <span>0741 406 263</span></a>
+      <a href="mailto:contact@itpex.ro">📧 contact@itpex.ro</a>
+      <a href="#programare">📅 Programare online</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 ITPEX · Toate drepturile rezervate</span>
+    <span>Stație autorizată RAR</span>
+  </div>
+</footer>
+
+<div class="toast" id="toast">✅ Programare înregistrată cu succes!</div>
+
+<script>
+const CONFIG = {
+  whatsapp_number: "0741406263",
+  api_base_url: window.API_BASE_URL || (location.hostname ? "https://itpex.onrender.com" : ""),
+};
+
+const API_BASE = CONFIG.api_base_url || "";
+
+const today = new Date();
+let viewYear = today.getFullYear(), viewMonth = today.getMonth();
+let selectedDate = null, selectedSlot = null;
+const MONTHS_RO = ["Ianuarie","Februarie","Martie","Aprilie","Mai","Iunie","Iulie","August","Septembrie","Octombrie","Noiembrie","Decembrie"];
+const DAYS_RO = ["Lu","Ma","Mi","Jo","Vi","Sâ","Du"];
+const SLOTS = ["08:00","08:45","09:30","10:15","11:00","11:45","13:00","13:45","14:30","15:15","16:00","16:45","17:30","18:15","19:00","19:45"];
+
+let availability = { bookings: [], blocked: {} };
+let backendOnline = true;
+
+function markSlotAsTaken(dateKeyValue, time){
+  if(!dateKeyValue||!time) return;
+  if(!availability.bookings) availability.bookings = [];
+  const exists = availability.bookings.some(b=>b.date===dateKeyValue && b.time===time && b.status!="anulat");
+  if(!exists){
+    availability.bookings.push({ date: dateKeyValue, time, status: "confirmat" });
+  }
+  // dacă utilizatorul se uită chiar la această zi, reafișăm grila ca butonul să devină roșu imediat
+  if(selectedDate && dateKeyValue === dateKey(selectedDate)){
+    showSlots(selectedDate, false);
+  }
+}
+
+async function loadAvailability() {
+  try {
+    const res = await fetch(API_BASE + "/api/availability");
+    if(!res.ok) throw new Error("status "+res.status);
+    availability = await res.json();
+    backendOnline = true;
+  } catch (err) {
+    backendOnline = false;
+    availability = { bookings: [], blocked: {} };
+    console.warn("Backend indisponibil, folosim calendar simplu:", err?.message || err);
+    const title = document.getElementById("slotsTitle");
+    if(title) title.textContent = "Calendar simplu (confirmăm manual)";
+  }
+}
+
+function getBlockedSlotsFor(dateKey){
+  return (availability.blocked && availability.blocked[dateKey]) || [];
+}
+function getBookedSlotsFor(dateKey){
+  return (availability.bookings || []).filter(b=>b.date===dateKey && b.status!=="anulat").map(b=>b.time);
+}
+function dateKey(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+
+function buildCalendar() {
+  const grid = document.getElementById("calGrid");
+  document.getElementById("calMonth").textContent = MONTHS_RO[viewMonth] + " " + viewYear;
+  grid.innerHTML = "";
+  DAYS_RO.forEach(d => { const el = document.createElement("div"); el.className="cal-day-label"; el.textContent=d; grid.appendChild(el); });
+  const firstDay = new Date(viewYear, viewMonth, 1);
+  let offset = (firstDay.getDay()+6)%7;
+  const dim = new Date(viewYear, viewMonth+1, 0).getDate();
+  for(let i=0;i<offset;i++){ const el=document.createElement("div"); el.className="cal-day empty"; grid.appendChild(el); }
+  for(let d=1;d<=dim;d++){
+    const el=document.createElement("div"); el.className="cal-day"; el.textContent=d;
+    const date=new Date(viewYear,viewMonth,d);
+    const isPast=date<new Date(today.getFullYear(),today.getMonth(),today.getDate());
+    const isSunday=date.getDay()===0;
+    const dk=dateKey(date);
+    const blockedSlots = getBlockedSlotsFor(dk);
+    const bookedSlots = getBookedSlotsFor(dk);
+    const taken = new Set([...(blockedSlots||[]), ...bookedSlots]);
+    const isFull = SLOTS.every(s=>taken.has(s));
+    const isToday=date.toDateString()===today.toDateString();
+    const isSel=selectedDate&&date.toDateString()===selectedDate.toDateString();
+    if(isPast||isSunday) el.classList.add("past");
+    else if(isFull) el.classList.add("full","available");
+    else el.classList.add("available");
+    if(isToday) el.classList.add("today");
+    if(isSel) el.classList.add("selected");
+    if(!isPast&&!isSunday) el.addEventListener("click",()=>selectDate(date,isFull,taken));
+    grid.appendChild(el);
+  }
+}
+
+function selectDate(date,isFull,taken){
+  selectedDate=date; selectedSlot=null; buildCalendar(); showSlots(date,isFull,taken);
+}
+
+function showSlots(date,isFull,taken){
+  const days=["Duminică","Luni","Marți","Miercuri","Joi","Vineri","Sâmbătă"];
+  document.getElementById("slotsTitle").textContent=days[date.getDay()]+", "+date.getDate()+" "+MONTHS_RO[date.getMonth()];
+  const grid=document.getElementById("slotsGrid");
+  grid.style.display="grid"; grid.innerHTML="";
+  const dk=dateKey(date);
+  const blockedSlots = getBlockedSlotsFor(dk);
+  const bookedSlots = getBookedSlotsFor(dk);
+  const takenSlots = taken ? taken : new Set([...(blockedSlots||[]), ...bookedSlots]);
+  SLOTS.forEach(slot=>{
+    const btn=document.createElement("button"); btn.className="slot-btn";
+    const full=takenSlots.has(slot);
+    if(full){ btn.classList.add("slot-full"); btn.innerHTML=slot+'<span class="slot-full-label">Ocupat</span>'; btn.disabled=true; }
+    else { btn.textContent=slot; btn.addEventListener("click",()=>selectSlot(slot,btn)); }
+    grid.appendChild(btn);
+  });
+}
+
+function selectSlot(slot,btn){
+  document.querySelectorAll(".slot-btn").forEach(b=>b.classList.remove("slot-selected"));
+  btn.classList.add("slot-selected"); selectedSlot=slot; showBookingForm();
+}
+
+function formatDateLabel(dateValue){
+  if(!dateValue) return "";
+  const parts=dateValue.split("-");
+  if(parts.length!==3) return dateValue;
+  const y=Number(parts[0]), m=Number(parts[1])-1, d=Number(parts[2]);
+  const dateObj=new Date(y,m,d);
+  const days=["Duminică","Luni","Marți","Miercuri","Joi","Vineri","Sâmbătă"];
+  return days[dateObj.getDay()]+", "+d+" "+MONTHS_RO[m]+" "+y;
+}
+
+function updateBookingSummary(){
+  const dateVal=document.getElementById("fData").value;
+  const timeVal=document.getElementById("fOra").value;
+  const dateLabel=formatDateLabel(dateVal);
+  document.getElementById("bookingSummary").innerHTML=
+    '<div class="sum-row"><span>📅 Data:</span><strong>'+(dateLabel||"Alege data dorită")+'</strong></div>'+
+    '<div class="sum-row"><span>⏰ Ora:</span><strong>'+(timeVal||"Alege ora dorită")+'</strong></div>'+
+    '<div class="sum-row"><span>📍 Stație:</span><strong>ITPEX — Str. Daciei nr. 30</strong></div>';
+}
+
+function showBookingForm(){
+  if(selectedDate){
+    const iso=String(selectedDate.getFullYear())+"-"+String(selectedDate.getMonth()+1).padStart(2,"0")+"-"+String(selectedDate.getDate()).padStart(2,"0");
+    document.getElementById("fData").value = iso;
+  }
+  if(selectedSlot){
+    document.getElementById("fOra").value = selectedSlot;
+  }
+  updateBookingSummary();
+  document.getElementById("bookingForm").scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+
+function isSlotUnavailable(dateIso,time){
+  if(!dateIso||!time) return false;
+  const blockedSlots = getBlockedSlotsFor(dateIso);
+  if(blockedSlots.includes(time)) return true;
+  const booked = getBookedSlotsFor(dateIso);
+  return booked.includes(time);
+}
+
+async function createBookingOnServer(booking){
+  if(!backendOnline) throw new Error("offline");
+  const res = await fetch(API_BASE + "/api/bookings", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(booking)
+  });
+  if(!res.ok){
+    const err = await res.json().catch(()=>({error:"Eroare server"}));
+    const msg = err.error || "Eroare server";
+    // Dacă slotul tocmai a fost luat de altcineva, serverul întoarce 409.
+    if(res.status === 409) throw new Error("Interval deja ocupat");
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+document.getElementById("btnBook").addEventListener("click",async ()=>{
+  const nume=document.getElementById("fNume").value.trim();
+  const tel=document.getElementById("fTel").value.trim();
+  const emailInput=document.getElementById("fEmail").value.trim();
+  const nrAuto=document.getElementById("fNrAuto").value.trim().toUpperCase();
+  const marcaModel=document.getElementById("fMarcaModel").value.trim().toUpperCase();
+  const combustibil=document.getElementById("fCombustibil").value.trim();
+  const an=document.getElementById("fAn").value.trim();
+  const obs=document.getElementById("fObs").value.trim();
+  const reminderChannel=document.getElementById("fReminder").value.trim();
+  const reminderConsent=document.getElementById("fReminderConsent").checked;
+  const dataVal=document.getElementById("fData").value.trim();
+  const oraVal=document.getElementById("fOra").value.trim();
+  const gdpr=document.getElementById("fGdpr").checked;
+  if(!nume||!tel||!nrAuto||!dataVal||!oraVal){ alert("Te rog completează toate câmpurile obligatorii."); return; }
+  if(!gdpr){ alert("Te rog bifează acordul GDPR."); return; }
+  if(reminderChannel && !reminderConsent){ alert("Te rog confirmă acordul pentru reminderul de expirare ITP."); return; }
+  if(isSlotUnavailable(dataVal, oraVal)){ alert("Acest interval este deja rezervat. Te rugăm alege altă oră."); return; }
+  const booking = {
+    id: "b"+Date.now()+Math.random().toString(16).slice(2,6),
+    name: nume,
+    phone: tel,
+    email: emailInput || null,
+    plate: nrAuto,
+    service: "ITP autoturisme",
+    status: "confirmat",
+    date: dataVal,
+    time: oraVal,
+    dateText: formatDateLabel(dataVal),
+    notes: obs,
+    reminderChannel: reminderChannel || null,
+    reminderConsent,
+    marcaModel,
+    combustibil,
+    an,
+    createdAt: new Date().toISOString()
+  };
+
+  let saved = null;
+  try {
+    const res = await createBookingOnServer(booking);
+    saved = res.booking;
+    markSlotAsTaken(saved.date, saved.time);
+  } catch(err){
+    const msg = err?.message || "Nu am putut salva programarea pe server. Încearcă din nou în câteva momente.";
+    if(msg === "offline"){
+      alert("Serverul este indisponibil momentan. Reîncearcă în câteva momente ca să blocăm intervalul.");
+    } else {
+      alert(msg);
+    }
+    return;
+  }
+
+  const dateLabel=formatDateLabel(dataVal);
+  const carParts=[];
+  carParts.push(nrAuto);
+  if(marcaModel) carParts.push(marcaModel);
+  if(combustibil) carParts.push(combustibil);
+  if(an) carParts.push(an);
+  let reminderLine = "";
+  if(reminderConsent){
+    const map={email:"Email",sms:"SMS",whatsapp:"WhatsApp"};
+    reminderLine = '🔔 Reminder expirare: <strong>Cu 7 zile înainte</strong> pe <strong>'+(map[reminderChannel]||"canalul ales")+'</strong><br>';
+  }
+  const confirmLine = 'Am înregistrat solicitarea. Te contactăm pentru confirmare.';
+
+  document.getElementById("successDetails").innerHTML=
+    '<strong>'+nume+'</strong>, programarea ta a fost înregistrată!<br><br>'+
+    '📅 <strong>'+dateLabel+'</strong> la <strong>'+oraVal+'</strong><br>'+
+    '🚗 Autovehicul: <strong>'+carParts.join(" • ")+'</strong><br>'+
+    reminderLine+
+    (obs ? '📝 Observații: <strong>'+obs+'</strong><br><br>' : '<br>')+
+    confirmLine+'<br>Te așteptăm la <strong>ITPEX</strong>!';
+  document.getElementById("bookingContent").style.display="none";
+  document.getElementById("bookingSuccess").style.display="block";
+  const toast=document.getElementById("toast"); toast.classList.add("show"); setTimeout(()=>toast.classList.remove("show"),4000);
+  // Reîmprospătăm calendarul ca ora aleasă să devină ocupată
+  await loadAvailability();
+  buildCalendar();
+});
+
+function resetBooking(){
+  selectedDate=null; selectedSlot=null;
+  document.getElementById("bookingContent").style.display="block";
+  document.getElementById("bookingSuccess").style.display="none";
+  document.getElementById("slotsTitle").textContent="← Selectează o dată";
+  document.getElementById("slotsGrid").style.display="none";
+  ["fNume","fTel","fEmail","fNrAuto","fMarcaModel","fCombustibil","fAn","fData","fOra","fObs","fReminder"].forEach(id=>document.getElementById(id).value="");
+  document.getElementById("fReminderConsent").checked=false;
+  document.getElementById("fGdpr").checked=false;
+  updateBookingSummary();
+  buildCalendar();
+}
+
+document.getElementById("prevMonth").addEventListener("click",()=>{ viewMonth--; if(viewMonth<0){viewMonth=11;viewYear--;} buildCalendar(); });
+document.getElementById("nextMonth").addEventListener("click",()=>{ viewMonth++; if(viewMonth>11){viewMonth=0;viewYear++;} buildCalendar(); });
+
+["fData","fOra"].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el) el.addEventListener("change",updateBookingSummary);
+});
+
+const observer=new IntersectionObserver(entries=>{ entries.forEach((e,i)=>{ if(e.isIntersecting) setTimeout(()=>e.target.classList.add("visible"),i*60); }); },{threshold:0.1});
+document.querySelectorAll(".reveal").forEach(el=>observer.observe(el));
+
+const nav = document.querySelector('nav');
+const navToggle = document.querySelector('.nav-toggle');
+if(nav && navToggle){
+  navToggle.addEventListener('click',()=>nav.classList.toggle('open'));
+  document.addEventListener('click',e=>{
+    if(!(e.target instanceof Element)) return;
+    if(!e.target.closest('nav')) nav.classList.remove('open');
+  });
+  document.querySelectorAll('.nav-links a').forEach(a=>a.addEventListener('click',()=>nav.classList.remove('open')));
+}
+
+function enforceUppercase(id){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.style.textTransform="uppercase";
+  el.addEventListener("input",()=>{
+    const start=el.selectionStart, end=el.selectionEnd;
+    el.value=el.value.toUpperCase();
+    if(start!==null && end!==null) el.setSelectionRange(start,end);
+  });
+}
+
+enforceUppercase("fNrAuto");
+enforceUppercase("fMarcaModel");
+
+(async function init(){
+  await loadAvailability();
+  buildCalendar();
+  updateBookingSummary();
+})();
+</script>
+</body>
+</html>

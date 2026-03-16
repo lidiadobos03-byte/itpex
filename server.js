@@ -5,34 +5,41 @@ const path = require("path");
 const fs = require("fs/promises");
 const crypto = require("crypto");
 const ExcelJS = require("exceljs");
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
+const Redis = require("ioredis");
 
 const DATA_DIR = path.join(__dirname, "data");
 const DATA_FILE = path.join(DATA_DIR, "store.json");
 const ADMIN_PASS = process.env.ADMIN_PASS || process.env.ADMIN_PASSWORD;
 const ADMIN_KEY = process.env.ADMIN_KEY || process.env.ADMIN_TOKEN;
 const SESSION_SECRET = process.env.SESSION_SECRET || "change-this-session-secret";
-const SMTP_HOST = process.env.SMTP_HOST;
-const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
-const SMTP_USER = process.env.SMTP_USER;
-const SMTP_PASS = process.env.SMTP_PASS;
-const SMTP_SECURE = String(process.env.SMTP_SECURE || "").toLowerCase() === "true" || SMTP_PORT === 465;
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const RESEND_FROM = process.env.RESEND_FROM || process.env.MAIL_FROM;
 const MAIL_TO = process.env.MAIL_TO || process.env.ADMIN_EMAIL;
-const MAIL_FROM = process.env.MAIL_FROM || SMTP_USER;
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || process.env.FRONTEND_ORIGIN;
+const REDIS_URL = process.env.REDIS_URL;
 
 let mailer = null;
 let emailWarningShown = false;
+let redis = null;
+
+function getRedis() {
+  if (!REDIS_URL) return null;
+  if (!redis) {
+    redis = new Redis(REDIS_URL, {
+      maxRetriesPerRequest: 2,
+      enableOfflineQueue: false,
+      lazyConnect: true,
+    });
+    redis.connect().catch(() => {});
+  }
+  return redis;
+}
 
 function getMailer() {
-  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS || !MAIL_TO) return null;
+  if (!RESEND_API_KEY || !MAIL_TO || !RESEND_FROM) return null;
   if (!mailer) {
-    mailer = nodemailer.createTransport({
-      host: SMTP_HOST,
-      port: SMTP_PORT,
-      secure: SMTP_SECURE,
-      auth: { user: SMTP_USER, pass: SMTP_PASS },
-    });
+    mailer = new Resend(RESEND_API_KEY);
   }
   return mailer;
 }
@@ -76,7 +83,7 @@ async function sendBookingEmail(booking) {
   const transport = getMailer();
   if (!transport) {
     if (!emailWarningShown) {
-      console.warn("ℹ️ Email trimitere dezactivată: setează SMTP_HOST/PORT/USER/PASS și MAIL_TO.");
+      console.warn("ℹ️ Email trimitere dezactivată: setează RESEND_API_KEY, RESEND_FROM și MAIL_TO.");
       emailWarningShown = true;
     }
     return;
@@ -96,15 +103,15 @@ async function sendBookingEmail(booking) {
       `Observații: ${booking.notes || "-"}`,
     ].join("\n");
 
-    await transport.sendMail({
-      from: MAIL_FROM || SMTP_USER,
+    await transport.emails.send({
+      from: RESEND_FROM,
       to: MAIL_TO,
       subject,
       text,
       attachments: [
         {
           filename: `programare-${booking.date}-${booking.time}.xlsx`,
-          content: excelBuffer,
+          content: excelBuffer.toString("base64"),
         },
       ],
     });
@@ -131,8 +138,8 @@ async function sendClientEmail(booking) {
       `Ne vedem la ITPEX, Str. Daciei nr. 30.`,
       `Dacă ai întrebări, sună-ne la ${MAIL_TO || "0741 406 263"}.`,
     ].join("\n");
-    await transport.sendMail({
-      from: MAIL_FROM || SMTP_USER,
+    await transport.emails.send({
+      from: RESEND_FROM,
       to: booking.email,
       subject,
       text,
@@ -146,23 +153,40 @@ if (!ADMIN_PASS) {
   console.warn("⚠️  Set ADMIN_PASS env var for production. Using fallback 'admin' for now.");
 }
 
-async function ensureStore() {
+const STORE_KEY = "itpex:store:v1";
+
+async function readStore() {
+  const client = getRedis();
+  if (client) {
+    try {
+      const raw = await client.get(STORE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (err) {
+      console.warn("ℹ️ Redis read fallback to file:", err.message);
+    }
+  }
   await fs.mkdir(DATA_DIR, { recursive: true });
   try {
-    await fs.access(DATA_FILE);
+    const raw = await fs.readFile(DATA_FILE, "utf8");
+    return JSON.parse(raw || '{"bookings":[],"blocked":{}}');
   } catch {
     const init = { bookings: [], blocked: {} };
     await fs.writeFile(DATA_FILE, JSON.stringify(init, null, 2), "utf8");
+    return init;
   }
 }
 
-async function readStore() {
-  await ensureStore();
-  const raw = await fs.readFile(DATA_FILE, "utf8");
-  return JSON.parse(raw || '{"bookings":[],"blocked":{}}');
-}
-
 async function writeStore(store) {
+  const client = getRedis();
+  if (client) {
+    try {
+      await client.set(STORE_KEY, JSON.stringify(store));
+      return;
+    } catch (err) {
+      console.warn("ℹ️ Redis write fallback to file:", err.message);
+    }
+  }
+  await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.writeFile(DATA_FILE, JSON.stringify(store, null, 2), "utf8");
 }
 
