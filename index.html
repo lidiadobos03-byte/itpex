@@ -757,9 +757,17 @@
 <div class="toast" id="toast">✅ Programare înregistrată cu succes!</div>
 
 <script>
+function getDefaultApiBaseUrl(){
+  const host = window.location.hostname;
+  if(!host || host==="localhost" || host==="127.0.0.1" || host.endsWith(".local") || host.endsWith("onrender.com")){
+    return "";
+  }
+  return "https://itpex.onrender.com";
+}
+
 const CONFIG = {
   whatsapp_number: "0741406263",
-  api_base_url: window.API_BASE_URL || (location.hostname ? "https://itpex.onrender.com" : ""),
+  api_base_url: window.API_BASE_URL || getDefaultApiBaseUrl(),
 };
 
 const API_BASE = CONFIG.api_base_url || "";
@@ -809,6 +817,29 @@ function getBookedSlotsFor(dateKey){
   return (availability.bookings || []).filter(b=>b.date===dateKey).map(b=>b.time);
 }
 function dateKey(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+function getTodayKey(){
+  return dateKey(new Date());
+}
+function parseDateInputValue(dateValue){
+  const match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(dateValue||"");
+  if(!match) return null;
+  const year=Number(match[1]), month=Number(match[2])-1, day=Number(match[3]);
+  const dateObj=new Date(year,month,day);
+  if(Number.isNaN(dateObj.getTime())||dateObj.getFullYear()!==year||dateObj.getMonth()!==month||dateObj.getDate()!==day){
+    return null;
+  }
+  return { dateObj, dateIso: dateValue };
+}
+function isBookableDateValue(dateValue){
+  const parsed=parseDateInputValue(dateValue);
+  if(!parsed) return false;
+  return parsed.dateIso >= getTodayKey() && parsed.dateObj.getDay() !== 0;
+}
+function syncDateInputConstraints(){
+  const input=document.getElementById("fData");
+  if(!input) return;
+  input.min = getTodayKey();
+}
 
 function buildCalendar() {
   const grid = document.getElementById("calGrid");
@@ -940,6 +971,8 @@ document.getElementById("btnBook").addEventListener("click",async ()=>{
   const oraVal=document.getElementById("fOra").value.trim();
   const gdpr=document.getElementById("fGdpr").checked;
   if(!nume||!tel||!nrAuto||!dataVal||!oraVal){ alert("Te rog completează toate câmpurile obligatorii."); return; }
+  if(!isBookableDateValue(dataVal)){ alert("Te rugăm alege o zi lucrătoare de azi înainte."); return; }
+  if(!SLOTS.includes(oraVal)){ alert("Te rugăm alege o oră validă din listă."); return; }
   if(!gdpr){ alert("Te rog bifează acordul GDPR."); return; }
   if(reminderChannel && !reminderConsent){ alert("Te rog confirmă acordul pentru reminderul de expirare ITP."); return; }
   if(isSlotUnavailable(dataVal, oraVal)){ alert("Acest interval este deja rezervat. Te rugăm alege altă oră."); return; }
@@ -1024,10 +1057,25 @@ function resetBooking(){
 document.getElementById("prevMonth").addEventListener("click",()=>{ viewMonth--; if(viewMonth<0){viewMonth=11;viewYear--;} buildCalendar(); });
 document.getElementById("nextMonth").addEventListener("click",()=>{ viewMonth++; if(viewMonth>11){viewMonth=0;viewYear++;} buildCalendar(); });
 
-["fData","fOra"].forEach(id=>{
-  const el=document.getElementById(id);
-  if(el) el.addEventListener("change",updateBookingSummary);
-});
+const dateInput=document.getElementById("fData");
+if(dateInput){
+  dateInput.addEventListener("change",()=>{
+    if(dateInput.value && !isBookableDateValue(dateInput.value)){
+      alert("Poți alege doar o zi lucrătoare de azi înainte.");
+      dateInput.value = "";
+    }
+    selectedDate = null;
+    selectedSlot = null;
+    document.getElementById("fOra").value = "";
+    updateBookingSummary();
+    buildCalendar();
+  });
+}
+
+const timeInput=document.getElementById("fOra");
+if(timeInput){
+  timeInput.addEventListener("change",updateBookingSummary);
+}
 
 const observer=new IntersectionObserver(entries=>{ entries.forEach((e,i)=>{ if(e.isIntersecting) setTimeout(()=>e.target.classList.add("visible"),i*60); }); },{threshold:0.1});
 document.querySelectorAll(".reveal").forEach(el=>observer.observe(el));
@@ -1058,6 +1106,7 @@ enforceUppercase("fNrAuto");
 enforceUppercase("fMarcaModel");
 
 (async function init(){
+  syncDateInputConstraints();
   await loadAvailability();
   buildCalendar();
   updateBookingSummary();

@@ -20,6 +20,9 @@ const MAIL_TO = process.env.MAIL_TO || process.env.ADMIN_EMAIL;
 const SUPPORT_PHONE = process.env.SUPPORT_PHONE || process.env.PHONE || "0741 406 263";
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || process.env.FRONTEND_ORIGIN;
 const REDIS_URL = process.env.REDIS_URL;
+const BUSINESS_TIMEZONE = process.env.BUSINESS_TIMEZONE || "Europe/Bucharest";
+const SLOT_TIMES = ["08:00", "08:45", "09:30", "10:15", "11:00", "11:45", "13:00", "13:45", "14:30", "15:15", "16:00", "16:45", "17:30", "18:15", "19:00", "19:45"];
+const WEEKDAYS_RO = ["Duminica", "Luni", "Marti", "Miercuri", "Joi", "Vineri", "Sambata"];
 
 let mailer = null;
 let emailWarningShown = false;
@@ -49,71 +52,222 @@ function getMailer() {
 async function buildBookingsExcel(bookings = []) {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("Programări");
+  wb.creator = "ITPEX";
+  wb.created = new Date();
   ws.columns = [
+    { header: "Data", key: "date", width: 13 },
+    { header: "Zi", key: "weekday", width: 12 },
+    { header: "Ora", key: "time", width: 10 },
+    { header: "Status", key: "status", width: 10 },
     { header: "Nume", key: "name", width: 22 },
     { header: "Telefon", key: "phone", width: 14 },
-    { header: "Email", key: "email", width: 24 },
     { header: "Nr. Auto", key: "plate", width: 12 },
-    { header: "Marca / Model", key: "marcaModel", width: 18 },
+    { header: "Marca / Model", key: "marcaModel", width: 20 },
     { header: "Combustibil", key: "combustibil", width: 12 },
     { header: "An", key: "an", width: 8 },
-    { header: "Data", key: "date", width: 14 },
-    { header: "Ora", key: "time", width: 10 },
+    { header: "Email", key: "email", width: 24 },
     { header: "Serviciu", key: "service", width: 16 },
-    { header: "Observații", key: "notes", width: 28 },
     { header: "Reminder", key: "reminderChannel", width: 12 },
-    { header: "Status", key: "status", width: 10 },
+    { header: "Observații", key: "notes", width: 34 },
     { header: "Creat la", key: "createdAt", width: 20 },
   ];
 
-  const ordered = [...bookings].sort((a, b) => {
-    const toTs = (item) => {
-      const base = item.date || item.dateText || "1970-01-01";
-      const t = item.time || "00:00";
-      const d = new Date(`${base}T${t}`);
-      return Number.isNaN(d.getTime()) ? 0 : d.getTime();
-    };
-    return toTs(a) - toTs(b);
-  });
+  const ordered = sortBookings(bookings);
 
   ordered.forEach((booking) => {
     ws.addRow({
+      date: formatDateForDisplay(booking.date || booking.dateText),
+      weekday: getWeekdayLabel(booking.date),
+      time: booking.time,
+      status: booking.status || "-",
       name: booking.name,
       phone: booking.phone,
-      email: booking.email || "-",
       plate: booking.plate,
       marcaModel: booking.marcaModel || booking.model || "-",
       combustibil: booking.combustibil || booking.fuel || "-",
       an: booking.an || booking.year || "-",
-      date: booking.dateText || booking.date,
-      time: booking.time,
+      email: booking.email || "-",
       service: booking.service || "ITP",
-      notes: booking.notes || "-",
       reminderChannel: booking.reminderChannel || "-",
-      status: booking.status || "-",
-      createdAt: booking.createdAt || "-",
+      notes: booking.notes || "-",
+      createdAt: formatDateTimeForDisplay(booking.createdAt),
     });
   });
 
-  ws.getRow(1).font = { bold: true };
+  ws.views = [{ state: "frozen", xSplit: 4, ySplit: 1 }];
+  ws.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: 1, column: ws.columns.length },
+  };
+  ws.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+  ws.getRow(1).fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FF1A4D2E" },
+  };
+  ws.getRow(1).alignment = { vertical: "middle", horizontal: "center" };
+  ws.getRow(1).height = 22;
+
+  const centerColumns = new Set(["A", "B", "C", "D", "F", "G", "H", "K", "M"]);
+  ws.eachRow((row, rowNumber) => {
+    row.eachCell((cell, colNumber) => {
+      const columnLetter = ws.getColumn(colNumber).letter;
+      cell.border = {
+        top: { style: "thin", color: { argb: "FFD1D5DB" } },
+        left: { style: "thin", color: { argb: "FFD1D5DB" } },
+        bottom: { style: "thin", color: { argb: "FFD1D5DB" } },
+        right: { style: "thin", color: { argb: "FFD1D5DB" } },
+      };
+      cell.alignment = {
+        vertical: "middle",
+        horizontal: centerColumns.has(columnLetter) ? "center" : "left",
+        wrapText: columnLetter === "N",
+      };
+
+      if (rowNumber > 1) {
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: rowNumber % 2 === 0 ? "FFF7FBF9" : "FFFFFFFF" },
+        };
+      }
+    });
+  });
+
   return wb.xlsx.writeBuffer();
 }
 
-function ensurePermanentBlocks(store) {
-  const normalized = {
-    bookings: Array.isArray(store?.bookings) ? store.bookings : [],
-    blocked: store?.blocked && typeof store.blocked === "object" ? store.blocked : {},
-  };
+function sortSlotTimes(times = []) {
+  return [...times].sort((a, b) => SLOT_TIMES.indexOf(a) - SLOT_TIMES.indexOf(b));
+}
 
-  normalized.bookings.forEach((booking) => {
-    if (!booking?.date || !booking?.time) return;
-    if (!normalized.blocked[booking.date]) normalized.blocked[booking.date] = [];
-    if (!normalized.blocked[booking.date].includes(booking.time)) {
-      normalized.blocked[booking.date].push(booking.time);
-    }
+function sortBlockedMap(blocked = {}) {
+  return Object.fromEntries(
+    Object.entries(blocked)
+      .sort(([dateA], [dateB]) => String(dateA).localeCompare(String(dateB)))
+      .map(([date, times]) => [date, sortSlotTimes(times)])
+  );
+}
+
+function normalizeBlockedMap(rawBlocked) {
+  const normalized = {};
+  if (!rawBlocked || typeof rawBlocked !== "object") return normalized;
+
+  Object.entries(rawBlocked).forEach(([date, times]) => {
+    if (!Array.isArray(times)) return;
+    const cleanTimes = sortSlotTimes(Array.from(new Set(times.filter((time) => SLOT_TIMES.includes(time)))));
+    if (cleanTimes.length) normalized[date] = cleanTimes;
   });
 
-  return normalized;
+  return sortBlockedMap(normalized);
+}
+
+function normalizeStore(store) {
+  const bookings = Array.isArray(store?.bookings) ? store.bookings : [];
+  const hasManualBlocked = !!(store?.manualBlocked && typeof store.manualBlocked === "object");
+  const sourceBlocked = hasManualBlocked ? store.manualBlocked : store?.blocked;
+  const blocked = normalizeBlockedMap(sourceBlocked);
+
+  if (!hasManualBlocked) {
+    const bookedByDate = new Map();
+    bookings.forEach((booking) => {
+      if (!booking?.date || !booking?.time) return;
+      if (!bookedByDate.has(booking.date)) bookedByDate.set(booking.date, new Set());
+      bookedByDate.get(booking.date).add(booking.time);
+    });
+
+    Object.entries(blocked).forEach(([date, times]) => {
+      const bookedTimes = bookedByDate.get(date);
+      if (!bookedTimes) return;
+      const manualOnly = times.filter((time) => !bookedTimes.has(time));
+      if (manualOnly.length) blocked[date] = manualOnly;
+      else delete blocked[date];
+    });
+  }
+
+  return { bookings, blocked: sortBlockedMap(blocked), manualBlocked: sortBlockedMap(blocked) };
+}
+
+function getDateKeyInTimeZone(date = new Date(), timeZone = BUSINESS_TIMEZONE) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateKey(dateValue) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateValue || "");
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return { year, month, day, weekday: date.getUTCDay() };
+}
+
+function validateBookingSlot(dateValue, timeValue) {
+  const parsedDate = parseDateKey(dateValue);
+  if (!parsedDate) return "Data selectată este invalidă";
+  if (parsedDate.weekday === 0) return "Nu se pot face programări duminica";
+  if (dateValue < getDateKeyInTimeZone()) return "Nu se pot face programări în trecut";
+  if (!SLOT_TIMES.includes(timeValue)) return "Ora selectată este invalidă";
+  return null;
+}
+
+function getBookingSortKey(booking = {}) {
+  const parsedDate = parseDateKey(booking.date);
+  const datePart = parsedDate ? booking.date : "9999-99-99";
+  const timePart = SLOT_TIMES.includes(booking.time) ? booking.time : "99:99";
+  const createdAtPart = booking.createdAt || "9999-99-99T99:99:99.999Z";
+  const platePart = booking.plate || "";
+  return `${datePart}|${timePart}|${createdAtPart}|${platePart}`;
+}
+
+function sortBookings(bookings = []) {
+  return [...bookings].sort((a, b) => getBookingSortKey(a).localeCompare(getBookingSortKey(b), "ro"));
+}
+
+function formatDateForDisplay(dateValue) {
+  const parsed = parseDateKey(dateValue);
+  if (!parsed) return dateValue || "-";
+  return `${String(parsed.day).padStart(2, "0")}.${String(parsed.month).padStart(2, "0")}.${parsed.year}`;
+}
+
+function getWeekdayLabel(dateValue) {
+  const parsed = parseDateKey(dateValue);
+  return parsed ? WEEKDAYS_RO[parsed.weekday] : "-";
+}
+
+function formatDateTimeForDisplay(dateValue) {
+  if (!dateValue) return "-";
+  const parsed = new Date(dateValue);
+  if (Number.isNaN(parsed.getTime())) return String(dateValue);
+  return new Intl.DateTimeFormat("ro-RO", {
+    timeZone: BUSINESS_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(parsed);
 }
 
 async function writeExcelSnapshot(bookings = []) {
@@ -205,7 +359,7 @@ async function readStore() {
   if (client) {
     try {
       const raw = await client.get(STORE_KEY);
-      if (raw) return ensurePermanentBlocks(JSON.parse(raw));
+      if (raw) return normalizeStore(JSON.parse(raw));
     } catch (err) {
       console.warn("ℹ️ Redis read fallback to file:", err.message);
     }
@@ -213,16 +367,16 @@ async function readStore() {
   await fs.mkdir(DATA_DIR, { recursive: true });
   try {
     const raw = await fs.readFile(DATA_FILE, "utf8");
-    return ensurePermanentBlocks(JSON.parse(raw || '{"bookings":[],"blocked":{}}'));
+    return normalizeStore(JSON.parse(raw || '{"bookings":[],"blocked":{},"manualBlocked":{}}'));
   } catch {
-    const init = { bookings: [], blocked: {} };
+    const init = { bookings: [], blocked: {}, manualBlocked: {} };
     await fs.writeFile(DATA_FILE, JSON.stringify(init, null, 2), "utf8");
     return init;
   }
 }
 
 async function writeStore(store) {
-  const normalized = ensurePermanentBlocks(store);
+  const normalized = normalizeStore(store);
   const client = getRedis();
   if (client) {
     try {
@@ -308,6 +462,10 @@ app.post("/api/bookings", async (req, res) => {
   if (!booking.name || !booking.phone || !booking.plate || !booking.date || !booking.time) {
     return res.status(400).json({ ok: false, error: "Câmpuri obligatorii lipsă" });
   }
+  const validationError = validateBookingSlot(booking.date, booking.time);
+  if (validationError) {
+    return res.status(400).json({ ok: false, error: validationError });
+  }
   const store = await readStore();
   const isTaken =
     (store.blocked?.[booking.date] || []).includes(booking.time) ||
@@ -321,10 +479,6 @@ app.post("/api/bookings", async (req, res) => {
     createdAt: new Date().toISOString(),
   };
   store.bookings.push(newBooking);
-  if (!store.blocked[booking.date]) store.blocked[booking.date] = [];
-  if (!store.blocked[booking.date].includes(booking.time)) {
-    store.blocked[booking.date].push(booking.time);
-  }
   await writeStore(store);
   sendBookingEmail(newBooking).catch(() => {});
   sendClientEmail(newBooking).catch(() => {});
@@ -334,7 +488,7 @@ app.post("/api/bookings", async (req, res) => {
 // ── ADMIN ENDPOINTS ─────────────────────────────────────────────────────────
 app.get("/api/admin/state", requireAuth, async (_req, res) => {
   const store = await readStore();
-  res.json({ ok: true, bookings: store.bookings || [], blocked: store.blocked || {} });
+  res.json({ ok: true, bookings: sortBookings(store.bookings || []), blocked: sortBlockedMap(store.blocked || {}) });
 });
 
 app.patch("/api/admin/bookings/:id/status", requireAuth, async (req, res) => {
@@ -362,20 +516,41 @@ app.delete("/api/admin/bookings/:id", requireAuth, async (req, res) => {
 app.post("/api/admin/block", requireAuth, async (req, res) => {
   const { date, time } = req.body || {};
   if (!date) return res.status(400).json({ ok: false, error: "Lipsește data" });
+  if (!parseDateKey(date)) return res.status(400).json({ ok: false, error: "Data este invalidă" });
+  if (time && !SLOT_TIMES.includes(time)) return res.status(400).json({ ok: false, error: "Ora este invalidă" });
   const store = await readStore();
   if (!store.blocked[date]) store.blocked[date] = [];
   if (time) {
     if (!store.blocked[date].includes(time)) store.blocked[date].push(time);
   } else {
-    const ALL = ["08:00","08:45","09:30","10:15","11:00","11:45","13:00","13:45","14:30","15:15","16:00","16:45","17:30","18:15","19:00","19:45"];
-    store.blocked[date] = Array.from(new Set([...(store.blocked[date] || []), ...ALL]));
+    store.blocked[date] = Array.from(new Set([...(store.blocked[date] || []), ...SLOT_TIMES]));
   }
   await writeStore(store);
   res.json({ ok: true });
 });
 
+app.post("/api/admin/unblock", requireAuth, async (req, res) => {
+  const { date, time } = req.body || {};
+  if (!date) return res.status(400).json({ ok: false, error: "Lipsește data" });
+  if (!parseDateKey(date)) return res.status(400).json({ ok: false, error: "Data este invalidă" });
+  if (time && !SLOT_TIMES.includes(time)) return res.status(400).json({ ok: false, error: "Ora este invalidă" });
+
+  const store = await readStore();
+  const existing = store.blocked[date] || [];
+
+  if (time) {
+    store.blocked[date] = existing.filter((slot) => slot !== time);
+    if (!store.blocked[date].length) delete store.blocked[date];
+  } else {
+    delete store.blocked[date];
+  }
+
+  await writeStore(store);
+  res.json({ ok: true, blocked: sortBlockedMap(store.blocked) });
+});
+
 // ── STATIC FILES ────────────────────────────────────────────────────────────
-const PUBLIC_DIR = path.join(__dirname);
+const PUBLIC_DIR = path.join(__dirname, "netlify-dist");
 app.use(express.static(PUBLIC_DIR));
 
 // Fallback to index for other GETs
