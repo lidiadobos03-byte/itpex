@@ -8,7 +8,8 @@ const ExcelJS = require("exceljs");
 const { Resend } = require("resend");
 const Redis = require("ioredis");
 
-const DATA_DIR = path.join(__dirname, "data");
+const CUSTOM_DATA_DIR = typeof process.env.DATA_DIR === "string" ? process.env.DATA_DIR.trim() : "";
+const DATA_DIR = CUSTOM_DATA_DIR ? path.resolve(CUSTOM_DATA_DIR) : path.join(__dirname, "data");
 const DATA_FILE = path.join(DATA_DIR, "store.json");
 const EXCEL_FILE = path.join(DATA_DIR, "programari-itp.xlsx");
 const ADMIN_PASS = process.env.ADMIN_PASS || process.env.ADMIN_PASSWORD;
@@ -27,8 +28,9 @@ const WEEKDAYS_RO = ["Duminica", "Luni", "Marti", "Miercuri", "Joi", "Vineri", "
 let mailer = null;
 let emailWarningShown = false;
 let redis = null;
+let redisReady = null;
 
-function getRedis() {
+async function getRedis() {
   if (!REDIS_URL) return null;
   if (!redis) {
     redis = new Redis(REDIS_URL, {
@@ -36,8 +38,21 @@ function getRedis() {
       enableOfflineQueue: false,
       lazyConnect: true,
     });
-    redis.connect().catch(() => {});
+    redis.on("end", () => {
+      redisReady = null;
+    });
+    redis.on("close", () => {
+      redisReady = null;
+    });
   }
+  if (redis.status === "ready") return redis;
+  if (!redisReady) {
+    redisReady = redis.connect().then(() => redis).catch((err) => {
+      redisReady = null;
+      throw err;
+    });
+  }
+  await redisReady;
   return redis;
 }
 
@@ -355,7 +370,7 @@ if (!ADMIN_PASS) {
 const STORE_KEY = "itpex:store:v1";
 
 async function readStore() {
-  const client = getRedis();
+  const client = await getRedis();
   if (client) {
     try {
       const raw = await client.get(STORE_KEY);
@@ -377,7 +392,7 @@ async function readStore() {
 
 async function writeStore(store) {
   const normalized = normalizeStore(store);
-  const client = getRedis();
+  const client = await getRedis();
   if (client) {
     try {
       await client.set(STORE_KEY, JSON.stringify(normalized));
@@ -561,6 +576,9 @@ app.get(/.*/, (_req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ ITPEX server pornit pe http://localhost:${PORT}`);
+  if (!REDIS_URL && !CUSTOM_DATA_DIR) {
+    console.warn(`⚠️  Rezervările sunt stocate doar local în ${DATA_DIR}. Pe hostinguri cu disc temporar se pot pierde la restart. Setează DATA_DIR pe un disc persistent sau REDIS_URL.`);
+  }
   readStore()
     .then((store) => writeExcelSnapshot(store.bookings || []))
     .catch((err) => console.warn("⚠️  Nu am putut inițializa Excel-ul cu programări:", err.message));

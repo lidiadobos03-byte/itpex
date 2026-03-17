@@ -778,9 +778,201 @@ let selectedDate = null, selectedSlot = null;
 const MONTHS_RO = ["Ianuarie","Februarie","Martie","Aprilie","Mai","Iunie","Iulie","August","Septembrie","Octombrie","Noiembrie","Decembrie"];
 const DAYS_RO = ["Lu","Ma","Mi","Jo","Vi","Sâ","Du"];
 const SLOTS = ["08:00","08:45","09:30","10:15","11:00","11:45","13:00","13:45","14:30","15:15","16:00","16:45","17:30","18:15","19:00","19:45"];
+const BOOKING_DRAFT_KEY = "itpex:booking-draft:v1";
+const BOOKING_VALUE_IDS = ["fNume","fTel","fEmail","fNrAuto","fMarcaModel","fCombustibil","fAn","fData","fOra","fObs","fReminder"];
+const BOOKING_CHECKBOX_IDS = ["fReminderConsent","fGdpr"];
+const LOCAL_BOOKINGS_KEY = "itpex:local-bookings:v1";
 
 let availability = { bookings: [], blocked: {} };
 let backendOnline = true;
+
+function getSlotsIntroText(){
+  return backendOnline ? "← Selectează o dată" : "Calendar simplu (confirmăm manual)";
+}
+
+function getDraftStorage(){
+  try {
+    return window.sessionStorage;
+  } catch(_err){
+    return null;
+  }
+}
+
+function getPersistentStorage(){
+  try {
+    return window.localStorage;
+  } catch(_err){
+    return null;
+  }
+}
+
+function normalizeLocalBookings(items){
+  if(!Array.isArray(items)) return [];
+  const unique = new Map();
+  items.forEach(item=>{
+    if(!item || typeof item !== "object") return;
+    if(typeof item.date !== "string" || typeof item.time !== "string") return;
+    if(!isBookableDateValue(item.date) || !SLOTS.includes(item.time)) return;
+    unique.set(`${item.date}|${item.time}`, {
+      date: item.date,
+      time: item.time,
+      status: item.status || "confirmat",
+      createdAt: item.createdAt || ""
+    });
+  });
+  return Array.from(unique.values()).sort((a,b)=>`${a.date}|${a.time}`.localeCompare(`${b.date}|${b.time}`));
+}
+
+function readLocalBookings(){
+  const storage = getPersistentStorage();
+  if(!storage) return [];
+  try {
+    const raw = storage.getItem(LOCAL_BOOKINGS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    const normalized = normalizeLocalBookings(parsed);
+    if(JSON.stringify(parsed) !== JSON.stringify(normalized)){
+      storage.setItem(LOCAL_BOOKINGS_KEY, JSON.stringify(normalized));
+    }
+    return normalized;
+  } catch(_err){
+    storage.removeItem(LOCAL_BOOKINGS_KEY);
+    return [];
+  }
+}
+
+function saveLocalBookings(bookings){
+  const storage = getPersistentStorage();
+  if(!storage) return;
+  const normalized = normalizeLocalBookings(bookings);
+  if(normalized.length){
+    storage.setItem(LOCAL_BOOKINGS_KEY, JSON.stringify(normalized));
+  } else {
+    storage.removeItem(LOCAL_BOOKINGS_KEY);
+  }
+}
+
+function rememberLocalBooking(booking){
+  if(!booking?.date || !booking?.time) return;
+  const bookings = readLocalBookings();
+  bookings.push({
+    date: booking.date,
+    time: booking.time,
+    status: booking.status || "confirmat",
+    createdAt: booking.createdAt || new Date().toISOString()
+  });
+  saveLocalBookings(bookings);
+}
+
+function mergeLocalBookingsIntoAvailability(){
+  const localBookings = readLocalBookings();
+  if(!availability.bookings) availability.bookings = [];
+  localBookings.forEach(localBooking=>{
+    const exists = availability.bookings.some(booking=>booking.date===localBooking.date && booking.time===localBooking.time);
+    if(!exists){
+      availability.bookings.push({
+        id: `local-${localBooking.date}-${localBooking.time}`,
+        date: localBooking.date,
+        time: localBooking.time,
+        status: localBooking.status || "confirmat"
+      });
+    }
+  });
+}
+
+function readBookingDraft(){
+  const storage = getDraftStorage();
+  if(!storage) return null;
+  try {
+    const raw = storage.getItem(BOOKING_DRAFT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch(_err){
+    storage.removeItem(BOOKING_DRAFT_KEY);
+    return null;
+  }
+}
+
+function saveBookingDraft(){
+  const storage = getDraftStorage();
+  if(!storage) return;
+  const values = {};
+  BOOKING_VALUE_IDS.forEach(id=>{
+    const el = document.getElementById(id);
+    values[id] = el ? el.value : "";
+  });
+  const checks = {};
+  BOOKING_CHECKBOX_IDS.forEach(id=>{
+    const el = document.getElementById(id);
+    checks[id] = !!(el && el.checked);
+  });
+  storage.setItem(BOOKING_DRAFT_KEY, JSON.stringify({
+    values,
+    checks,
+    selectedDate: selectedDate ? dateKey(selectedDate) : "",
+    selectedSlot: selectedSlot || ""
+  }));
+}
+
+function clearBookingDraft(){
+  const storage = getDraftStorage();
+  if(storage) storage.removeItem(BOOKING_DRAFT_KEY);
+}
+
+function resetSlotPicker(){
+  document.getElementById("slotsTitle").textContent = getSlotsIntroText();
+  const grid = document.getElementById("slotsGrid");
+  grid.style.display = "none";
+  grid.innerHTML = "";
+}
+
+function restoreBookingDraft(){
+  const draft = readBookingDraft();
+  if(!draft || typeof draft !== "object") return false;
+
+  BOOKING_VALUE_IDS.forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    const value = draft.values && typeof draft.values[id] === "string" ? draft.values[id] : "";
+    el.value = value;
+  });
+  BOOKING_CHECKBOX_IDS.forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.checked = !!(draft.checks && draft.checks[id]);
+  });
+
+  const storedDate = typeof draft.selectedDate === "string" && draft.selectedDate
+    ? draft.selectedDate
+    : document.getElementById("fData").value.trim();
+  const parsedDate = isBookableDateValue(storedDate) ? parseDateInputValue(storedDate) : null;
+  if(parsedDate){
+    selectedDate = parsedDate.dateObj;
+    document.getElementById("fData").value = parsedDate.dateIso;
+  } else {
+    selectedDate = null;
+    document.getElementById("fData").value = "";
+  }
+
+  const storedSlot = typeof draft.selectedSlot === "string" && SLOTS.includes(draft.selectedSlot)
+    ? draft.selectedSlot
+    : document.getElementById("fOra").value.trim();
+  if(selectedDate && SLOTS.includes(storedSlot)){
+    selectedSlot = storedSlot;
+    document.getElementById("fOra").value = storedSlot;
+  } else {
+    selectedSlot = null;
+    document.getElementById("fOra").value = "";
+  }
+
+  return true;
+}
+
+function attachBookingDraftPersistence(){
+  [...BOOKING_VALUE_IDS, ...BOOKING_CHECKBOX_IDS].forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    ["input","change"].forEach(eventName=>el.addEventListener(eventName, saveBookingDraft));
+  });
+}
 
 function markSlotAsTaken(dateKeyValue, time){
   if(!dateKeyValue||!time) return;
@@ -806,8 +998,9 @@ async function loadAvailability() {
     availability = { bookings: [], blocked: {} };
     console.warn("Backend indisponibil, folosim calendar simplu:", err?.message || err);
     const title = document.getElementById("slotsTitle");
-    if(title) title.textContent = "Calendar simplu (confirmăm manual)";
+    if(title) title.textContent = getSlotsIntroText();
   }
+  mergeLocalBookingsIntoAvailability();
 }
 
 function getBlockedSlotsFor(dateKey){
@@ -873,7 +1066,14 @@ function buildCalendar() {
 }
 
 function selectDate(date,isFull,taken){
-  selectedDate=date; selectedSlot=null; buildCalendar(); showSlots(date,isFull,taken);
+  selectedDate=date;
+  selectedSlot=null;
+  document.getElementById("fData").value = dateKey(date);
+  document.getElementById("fOra").value = "";
+  buildCalendar();
+  showSlots(date,isFull,taken);
+  updateBookingSummary();
+  saveBookingDraft();
 }
 
 function showSlots(date,isFull,taken){
@@ -889,7 +1089,11 @@ function showSlots(date,isFull,taken){
     const btn=document.createElement("button"); btn.className="slot-btn";
     const full=takenSlots.has(slot);
     if(full){ btn.classList.add("slot-full"); btn.innerHTML=slot+'<span class="slot-full-label">Ocupat</span>'; btn.disabled=true; }
-    else { btn.textContent=slot; btn.addEventListener("click",()=>selectSlot(slot,btn)); }
+    else {
+      btn.textContent=slot;
+      if(selectedSlot===slot) btn.classList.add("slot-selected");
+      btn.addEventListener("click",()=>selectSlot(slot,btn));
+    }
     grid.appendChild(btn);
   });
 }
@@ -919,7 +1123,8 @@ function updateBookingSummary(){
     '<div class="sum-row"><span>📍 Stație:</span><strong>ITPEX — Str. Daciei nr. 30</strong></div>';
 }
 
-function showBookingForm(){
+function showBookingForm(options={}){
+  const { scroll = true } = options;
   if(selectedDate){
     const iso=String(selectedDate.getFullYear())+"-"+String(selectedDate.getMonth()+1).padStart(2,"0")+"-"+String(selectedDate.getDate()).padStart(2,"0");
     document.getElementById("fData").value = iso;
@@ -928,7 +1133,10 @@ function showBookingForm(){
     document.getElementById("fOra").value = selectedSlot;
   }
   updateBookingSummary();
-  document.getElementById("bookingForm").scrollIntoView({behavior:"smooth",block:"nearest"});
+  saveBookingDraft();
+  if(scroll){
+    document.getElementById("bookingForm").scrollIntoView({behavior:"smooth",block:"nearest"});
+  }
 }
 
 function isSlotUnavailable(dateIso,time){
@@ -1000,6 +1208,7 @@ document.getElementById("btnBook").addEventListener("click",async ()=>{
   try {
     const res = await createBookingOnServer(booking);
     saved = res.booking;
+    rememberLocalBooking(saved);
     markSlotAsTaken(saved.date, saved.time);
   } catch(err){
     const msg = err?.message || "Nu am putut salva programarea pe server. Încearcă din nou în câteva momente.";
@@ -1035,6 +1244,7 @@ document.getElementById("btnBook").addEventListener("click",async ()=>{
   document.getElementById("bookingContent").style.display="none";
   document.getElementById("bookingSuccess").style.display="block";
   document.getElementById("bookingSuccess").scrollIntoView({behavior:"smooth", block:"start"});
+  clearBookingDraft();
   const toast=document.getElementById("toast"); toast.classList.add("show"); setTimeout(()=>toast.classList.remove("show"),4000);
   // Reîmprospătăm calendarul ca ora aleasă să devină ocupată
   await loadAvailability();
@@ -1043,13 +1253,14 @@ document.getElementById("btnBook").addEventListener("click",async ()=>{
 
 function resetBooking(){
   selectedDate=null; selectedSlot=null;
+  viewYear=today.getFullYear(); viewMonth=today.getMonth();
   document.getElementById("bookingContent").style.display="block";
   document.getElementById("bookingSuccess").style.display="none";
-  document.getElementById("slotsTitle").textContent="← Selectează o dată";
-  document.getElementById("slotsGrid").style.display="none";
+  resetSlotPicker();
   ["fNume","fTel","fEmail","fNrAuto","fMarcaModel","fCombustibil","fAn","fData","fOra","fObs","fReminder"].forEach(id=>document.getElementById(id).value="");
   document.getElementById("fReminderConsent").checked=false;
   document.getElementById("fGdpr").checked=false;
+  clearBookingDraft();
   updateBookingSummary();
   buildCalendar();
 }
@@ -1064,17 +1275,29 @@ if(dateInput){
       alert("Poți alege doar o zi lucrătoare de azi înainte.");
       dateInput.value = "";
     }
-    selectedDate = null;
+    const parsed = parseDateInputValue(dateInput.value);
+    selectedDate = parsed ? parsed.dateObj : null;
+    if(selectedDate){
+      viewYear = selectedDate.getFullYear();
+      viewMonth = selectedDate.getMonth();
+    }
     selectedSlot = null;
     document.getElementById("fOra").value = "";
-    updateBookingSummary();
     buildCalendar();
+    if(selectedDate) showSlots(selectedDate);
+    else resetSlotPicker();
+    updateBookingSummary();
+    saveBookingDraft();
   });
 }
 
 const timeInput=document.getElementById("fOra");
 if(timeInput){
-  timeInput.addEventListener("change",updateBookingSummary);
+  timeInput.addEventListener("change",()=>{
+    selectedSlot = SLOTS.includes(timeInput.value) ? timeInput.value : null;
+    updateBookingSummary();
+    saveBookingDraft();
+  });
 }
 
 const observer=new IntersectionObserver(entries=>{ entries.forEach((e,i)=>{ if(e.isIntersecting) setTimeout(()=>e.target.classList.add("visible"),i*60); }); },{threshold:0.1});
@@ -1104,12 +1327,26 @@ function enforceUppercase(id){
 
 enforceUppercase("fNrAuto");
 enforceUppercase("fMarcaModel");
+attachBookingDraftPersistence();
 
 (async function init(){
+  restoreBookingDraft();
   syncDateInputConstraints();
   await loadAvailability();
+  if(selectedDate && selectedSlot && isSlotUnavailable(dateKey(selectedDate), selectedSlot)){
+    selectedSlot = null;
+    document.getElementById("fOra").value = "";
+  }
   buildCalendar();
-  updateBookingSummary();
+  if(selectedDate){
+    showSlots(selectedDate);
+    if(selectedSlot) showBookingForm({ scroll:false });
+    else updateBookingSummary();
+  } else {
+    resetSlotPicker();
+    updateBookingSummary();
+  }
+  saveBookingDraft();
 })();
 </script>
 </body>
