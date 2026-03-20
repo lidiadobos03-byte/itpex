@@ -21,6 +21,8 @@ const MAIL_TO = process.env.MAIL_TO || process.env.ADMIN_EMAIL;
 const SUPPORT_PHONE = process.env.SUPPORT_PHONE || process.env.PHONE || "0741 406 263";
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || process.env.FRONTEND_ORIGIN;
 const REDIS_URL = process.env.REDIS_URL;
+const REDIS_CONNECT_TIMEOUT_MS = Number.parseInt(process.env.REDIS_CONNECT_TIMEOUT_MS || "", 10) || 4000;
+const REDIS_RETRY_COOLDOWN_MS = Number.parseInt(process.env.REDIS_RETRY_COOLDOWN_MS || "", 10) || 60000;
 const BUSINESS_TIMEZONE = process.env.BUSINESS_TIMEZONE || "Europe/Bucharest";
 const SLOT_TIMES = ["08:00", "08:45", "09:30", "10:15", "11:00", "11:45", "13:00", "13:45", "14:30", "15:15", "16:00", "16:45", "17:30", "18:15", "19:00", "19:45"];
 const WEEKDAYS_RO = ["Duminica", "Luni", "Marti", "Miercuri", "Joi", "Vineri", "Sambata"];
@@ -29,14 +31,53 @@ let mailer = null;
 let emailWarningShown = false;
 let redis = null;
 let redisReady = null;
+let redisUnavailableUntil = 0;
+let lastRedisWarning = "";
+
+function warnRedis(message) {
+  if (!message || message === lastRedisWarning) return;
+  lastRedisWarning = message;
+  console.warn(message);
+}
+
+function withTimeout(promise, timeoutMs, label) {
+  let timeoutId = null;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(label)), timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId);
+  });
+}
+
+function disableRedisTemporarily(reason) {
+  const suffix = reason ? `: ${reason}` : "";
+  redisUnavailableUntil = Date.now() + REDIS_RETRY_COOLDOWN_MS;
+  warnRedis(`ℹ️ Redis indisponibil, folosim fallback pe fișier${suffix}`);
+
+  if (redis) {
+    try {
+      redis.disconnect(false);
+    } catch (_err) {
+      // noop
+    }
+  }
+
+  redis = null;
+  redisReady = null;
+}
 
 async function getRedis() {
   if (!REDIS_URL) return null;
+  if (Date.now() < redisUnavailableUntil) return null;
   if (!redis) {
     redis = new Redis(REDIS_URL, {
-      maxRetriesPerRequest: 2,
+      maxRetriesPerRequest: 1,
       enableOfflineQueue: false,
       lazyConnect: true,
+      connectTimeout: REDIS_CONNECT_TIMEOUT_MS,
+      retryStrategy: () => null,
     });
     redis.on("end", () => {
       redisReady = null;
@@ -44,16 +85,26 @@ async function getRedis() {
     redis.on("close", () => {
       redisReady = null;
     });
+    redis.on("error", (err) => {
+      warnRedis(`ℹ️ Redis error: ${err.message}`);
+    });
   }
   if (redis.status === "ready") return redis;
   if (!redisReady) {
-    redisReady = redis.connect().then(() => redis).catch((err) => {
-      redisReady = null;
-      throw err;
-    });
+    redisReady = withTimeout(
+      redis.connect().then(() => redis),
+      REDIS_CONNECT_TIMEOUT_MS + 250,
+      `Redis connect timeout after ${REDIS_CONNECT_TIMEOUT_MS}ms`
+    )
+      .catch((err) => {
+        disableRedisTemporarily(err.message);
+        return null;
+      })
+      .finally(() => {
+        redisReady = null;
+      });
   }
-  await redisReady;
-  return redis;
+  return redisReady;
 }
 
 function getMailer() {
@@ -376,7 +427,7 @@ async function readStore() {
       const raw = await client.get(STORE_KEY);
       if (raw) return normalizeStore(JSON.parse(raw));
     } catch (err) {
-      console.warn("ℹ️ Redis read fallback to file:", err.message);
+      disableRedisTemporarily(`read failed (${err.message})`);
     }
   }
   await fs.mkdir(DATA_DIR, { recursive: true });
@@ -397,7 +448,7 @@ async function writeStore(store) {
     try {
       await client.set(STORE_KEY, JSON.stringify(normalized));
     } catch (err) {
-      console.warn("ℹ️ Redis write fallback to file:", err.message);
+      disableRedisTemporarily(`write failed (${err.message})`);
     }
   }
   await fs.mkdir(DATA_DIR, { recursive: true });

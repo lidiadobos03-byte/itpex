@@ -758,11 +758,7 @@
 
 <script>
 function getDefaultApiBaseUrl(){
-  const host = window.location.hostname;
-  if(!host || host==="localhost" || host==="127.0.0.1" || host.endsWith(".local") || host.endsWith("onrender.com")){
-    return "";
-  }
-  return "https://itpex.onrender.com";
+  return "";
 }
 
 const CONFIG = {
@@ -771,6 +767,7 @@ const CONFIG = {
 };
 
 const API_BASE = CONFIG.api_base_url || "";
+const API_REQUEST_TIMEOUT_MS = Number(window.API_REQUEST_TIMEOUT_MS || 8000);
 
 const today = new Date();
 let viewYear = today.getFullYear(), viewMonth = today.getMonth();
@@ -785,6 +782,20 @@ const LOCAL_BOOKINGS_KEY = "itpex:local-bookings:v1";
 
 let availability = { bookings: [], blocked: {} };
 let backendOnline = true;
+
+function isAbortError(err){
+  return !!err && (err.name === "AbortError" || err.code === 20);
+}
+
+async function fetchWithTimeout(resource, options = {}, timeoutMs = API_REQUEST_TIMEOUT_MS){
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(resource, { ...options, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
 
 function getSlotsIntroText(){
   return backendOnline ? "← Selectează o dată" : "Calendar simplu (confirmăm manual)";
@@ -989,7 +1000,7 @@ function markSlotAsTaken(dateKeyValue, time){
 
 async function loadAvailability() {
   try {
-    const res = await fetch(API_BASE + "/api/availability");
+    const res = await fetchWithTimeout(API_BASE + "/api/availability", {}, 6000);
     if(!res.ok) throw new Error("status "+res.status);
     availability = await res.json();
     backendOnline = true;
@@ -1149,11 +1160,17 @@ function isSlotUnavailable(dateIso,time){
 
 async function createBookingOnServer(booking){
   if(!backendOnline) throw new Error("offline");
-  const res = await fetch(API_BASE + "/api/bookings", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify(booking)
-  });
+  let res;
+  try {
+    res = await fetchWithTimeout(API_BASE + "/api/bookings", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(booking)
+    }, 12000);
+  } catch(err){
+    if(isAbortError(err)) throw new Error("Serverul răspunde prea greu. Reîncearcă în câteva momente.");
+    throw new Error("offline");
+  }
   if(!res.ok){
     const err = await res.json().catch(()=>({error:"Eroare server"}));
     const msg = err.error || "Eroare server";
