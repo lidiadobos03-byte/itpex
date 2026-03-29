@@ -353,6 +353,7 @@
     transition: all 0.22s; box-shadow: 0 6px 20px rgba(45,122,71,0.3);
   }
   .btn-book:hover { background: var(--green-dark); transform: translateY(-2px); box-shadow: 0 10px 28px rgba(26,77,46,0.35); }
+  .btn-book:disabled { opacity: 0.78; cursor: wait; transform: none; box-shadow: 0 6px 20px rgba(45,122,71,0.2); }
 
   .booking-success {
     display: none;
@@ -768,6 +769,10 @@ const CONFIG = {
 
 const API_BASE = CONFIG.api_base_url || "";
 const API_REQUEST_TIMEOUT_MS = Number(window.API_REQUEST_TIMEOUT_MS || 8000);
+const API_AVAILABILITY_TIMEOUT_MS = Number(window.API_AVAILABILITY_TIMEOUT_MS || 6000);
+const API_BOOKING_TIMEOUT_MS = Number(window.API_BOOKING_TIMEOUT_MS || 20000);
+const UNCERTAIN_BOOKING_CHECK_DELAYS_MS = [1200, 2500, 5000];
+const BACKEND_RECOVERY_RETRY_DELAYS_MS = [2500, 5000, 10000, 15000];
 
 const today = new Date();
 let viewYear = today.getFullYear(), viewMonth = today.getMonth();
@@ -782,6 +787,9 @@ const LOCAL_BOOKINGS_KEY = "itpex:local-bookings:v1";
 
 let availability = { bookings: [], blocked: {} };
 let backendOnline = true;
+let bookingSubmitInFlight = false;
+let backendRecoveryTimer = null;
+let backendRecoveryAttempt = 0;
 
 function isAbortError(err){
   return !!err && (err.name === "AbortError" || err.code === 20);
@@ -798,7 +806,32 @@ async function fetchWithTimeout(resource, options = {}, timeoutMs = API_REQUEST_
 }
 
 function getSlotsIntroText(){
-  return backendOnline ? "← Selectează o dată" : "Calendar simplu (confirmăm manual)";
+  return backendOnline ? "← Selectează o dată" : "Calendar simplu (reconectăm automat...)";
+}
+
+function sleep(ms){
+  return new Promise(resolve => window.setTimeout(resolve, ms));
+}
+
+function setBookingSubmitting(isSubmitting){
+  const btn = document.getElementById("btnBook");
+  if(!btn) return;
+  if(!btn.dataset.defaultLabel) btn.dataset.defaultLabel = btn.textContent;
+  bookingSubmitInFlight = isSubmitting;
+  btn.disabled = isSubmitting;
+  btn.setAttribute("aria-busy", isSubmitting ? "true" : "false");
+  btn.textContent = isSubmitting ? "Se trimite..." : btn.dataset.defaultLabel;
+}
+
+function clearBackendRecoveryTimer(){
+  if(!backendRecoveryTimer) return;
+  window.clearTimeout(backendRecoveryTimer);
+  backendRecoveryTimer = null;
+}
+
+function resetBackendRecoveryState(){
+  clearBackendRecoveryTimer();
+  backendRecoveryAttempt = 0;
 }
 
 function getDraftStorage(){
@@ -888,6 +921,35 @@ function mergeLocalBookingsIntoAvailability(){
       });
     }
   });
+}
+
+function syncBookingUiAfterAvailabilityRefresh(){
+  if(selectedDate && selectedSlot && isSlotUnavailable(dateKey(selectedDate), selectedSlot)){
+    selectedSlot = null;
+    document.getElementById("fOra").value = "";
+  }
+  buildCalendar();
+  if(selectedDate){
+    showSlots(selectedDate);
+    if(selectedSlot) showBookingForm({ scroll:false });
+    else updateBookingSummary();
+  } else {
+    resetSlotPicker();
+    updateBookingSummary();
+  }
+  saveBookingDraft();
+}
+
+function scheduleBackendRecovery(){
+  if(backendOnline || backendRecoveryTimer) return;
+  const delay = BACKEND_RECOVERY_RETRY_DELAYS_MS[Math.min(backendRecoveryAttempt, BACKEND_RECOVERY_RETRY_DELAYS_MS.length - 1)];
+  backendRecoveryAttempt += 1;
+  backendRecoveryTimer = window.setTimeout(async ()=>{
+    backendRecoveryTimer = null;
+    await loadAvailability({ skipAutoRecovery: true });
+    syncBookingUiAfterAvailabilityRefresh();
+    if(!backendOnline) scheduleBackendRecovery();
+  }, delay);
 }
 
 function readBookingDraft(){
@@ -998,18 +1060,24 @@ function markSlotAsTaken(dateKeyValue, time){
   }
 }
 
-async function loadAvailability() {
+async function loadAvailability(options = {}) {
+  const { skipAutoRecovery = false } = options;
+  const previousAvailability = availability;
   try {
-    const res = await fetchWithTimeout(API_BASE + "/api/availability", {}, 6000);
+    const res = await fetchWithTimeout(API_BASE + "/api/availability", {}, API_AVAILABILITY_TIMEOUT_MS);
     if(!res.ok) throw new Error("status "+res.status);
     availability = await res.json();
     backendOnline = true;
+    resetBackendRecoveryState();
   } catch (err) {
     backendOnline = false;
-    availability = { bookings: [], blocked: {} };
+    availability = previousAvailability && typeof previousAvailability === "object"
+      ? previousAvailability
+      : { bookings: [], blocked: {} };
     console.warn("Backend indisponibil, folosim calendar simplu:", err?.message || err);
     const title = document.getElementById("slotsTitle");
     if(title) title.textContent = getSlotsIntroText();
+    if(!skipAutoRecovery) scheduleBackendRecovery();
   }
   mergeLocalBookingsIntoAvailability();
 }
@@ -1158,16 +1226,37 @@ function isSlotUnavailable(dateIso,time){
   return booked.includes(time);
 }
 
+function findBookingById(bookingId){
+  if(!bookingId) return null;
+  return (availability.bookings || []).find(item => item.id === bookingId) || null;
+}
+
+async function confirmBookingAfterUncertainSubmit(booking){
+  if(!booking?.id) return null;
+  for(const delay of UNCERTAIN_BOOKING_CHECK_DELAYS_MS){
+    await sleep(delay);
+    await loadAvailability({ skipAutoRecovery: true });
+    const match = findBookingById(booking.id);
+    if(match){
+      backendOnline = true;
+      return { ...booking, ...match };
+    }
+  }
+  return null;
+}
+
 async function createBookingOnServer(booking){
-  if(!backendOnline) throw new Error("offline");
   let res;
   try {
     res = await fetchWithTimeout(API_BASE + "/api/bookings", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body: JSON.stringify(booking)
-    }, 12000);
+    }, backendOnline ? API_BOOKING_TIMEOUT_MS : Math.max(API_BOOKING_TIMEOUT_MS, 25000));
   } catch(err){
+    const recoveredBooking = await confirmBookingAfterUncertainSubmit(booking);
+    if(recoveredBooking) return { ok:true, booking: recoveredBooking, recovered: true };
+    scheduleBackendRecovery();
     if(isAbortError(err)) throw new Error("Serverul răspunde prea greu. Reîncearcă în câteva momente.");
     throw new Error("offline");
   }
@@ -1178,10 +1267,12 @@ async function createBookingOnServer(booking){
     if(res.status === 409) throw new Error("Interval deja ocupat");
     throw new Error(msg);
   }
+  backendOnline = true;
   return res.json();
 }
 
 document.getElementById("btnBook").addEventListener("click",async ()=>{
+  if(bookingSubmitInFlight) return;
   const nume=document.getElementById("fNume").value.trim();
   const tel=document.getElementById("fTel").value.trim();
   const emailInput=document.getElementById("fEmail").value.trim();
@@ -1222,6 +1313,7 @@ document.getElementById("btnBook").addEventListener("click",async ()=>{
   };
 
   let saved = null;
+  setBookingSubmitting(true);
   try {
     const res = await createBookingOnServer(booking);
     saved = res.booking;
@@ -1235,6 +1327,8 @@ document.getElementById("btnBook").addEventListener("click",async ()=>{
       alert(msg);
     }
     return;
+  } finally {
+    setBookingSubmitting(false);
   }
 
   const dateLabel=formatDateLabel(dataVal);
@@ -1265,12 +1359,13 @@ document.getElementById("btnBook").addEventListener("click",async ()=>{
   const toast=document.getElementById("toast"); toast.classList.add("show"); setTimeout(()=>toast.classList.remove("show"),4000);
   // Reîmprospătăm calendarul ca ora aleasă să devină ocupată
   await loadAvailability();
-  buildCalendar();
+  syncBookingUiAfterAvailabilityRefresh();
 });
 
 function resetBooking(){
   selectedDate=null; selectedSlot=null;
   viewYear=today.getFullYear(); viewMonth=today.getMonth();
+  setBookingSubmitting(false);
   document.getElementById("bookingContent").style.display="block";
   document.getElementById("bookingSuccess").style.display="none";
   resetSlotPicker();
@@ -1345,25 +1440,17 @@ function enforceUppercase(id){
 enforceUppercase("fNrAuto");
 enforceUppercase("fMarcaModel");
 attachBookingDraftPersistence();
+window.addEventListener("online", ()=>{
+  if(backendOnline) return;
+  clearBackendRecoveryTimer();
+  loadAvailability({ skipAutoRecovery: true }).then(syncBookingUiAfterAvailabilityRefresh);
+});
 
 (async function init(){
   restoreBookingDraft();
   syncDateInputConstraints();
   await loadAvailability();
-  if(selectedDate && selectedSlot && isSlotUnavailable(dateKey(selectedDate), selectedSlot)){
-    selectedSlot = null;
-    document.getElementById("fOra").value = "";
-  }
-  buildCalendar();
-  if(selectedDate){
-    showSlots(selectedDate);
-    if(selectedSlot) showBookingForm({ scroll:false });
-    else updateBookingSummary();
-  } else {
-    resetSlotPicker();
-    updateBookingSummary();
-  }
-  saveBookingDraft();
+  syncBookingUiAfterAvailabilityRefresh();
 })();
 </script>
 </body>

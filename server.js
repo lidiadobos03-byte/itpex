@@ -533,6 +533,10 @@ app.post("/api/bookings", async (req, res) => {
     return res.status(400).json({ ok: false, error: validationError });
   }
   const store = await readStore();
+  const existingBooking = booking.id ? store.bookings.find((b) => b.id === booking.id) : null;
+  if (existingBooking) {
+    return res.json({ ok: true, booking: existingBooking, duplicate: true });
+  }
   const isTaken =
     (store.blocked?.[booking.date] || []).includes(booking.time) ||
     store.bookings.some((b) => b.date === booking.date && b.time === booking.time);
